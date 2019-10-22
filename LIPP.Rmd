@@ -7,6 +7,7 @@ output: html_document
 
 ```{r, include=FALSE, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(echo = TRUE, fig.width=6, fig.height=4)
 ```
 
 <big>
@@ -15,13 +16,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## The Languages in the Prairies Project (LIPP)
 
-We will be working with data from Dr. Nicole Rosen's LIPP corpus which she has been building over the past several years. We will focus on data collected in interviews with Winnipeg residents who are either migrants from the Philippines, or who have Filipino ancestry.
+We will be working with data from Dr. Nicole Rosen's LIPP corpus which documents language variation in the Prairie provinces. We will focus on data collected in interviews with Winnipeg residents who are either migrants from the Philippines, or who have Filipino ancestry.
 
 ---
 
 ## Loading the data
 
-First, we will make sure that some R packages are loaded which we will need later. The `dplyr` package may give you some warnings which you don't need to worry about.
+First, we will load some R packages which we will need later. The `dplyr` package may give you some warnings which you don't need to worry about.
 
 ```{r, message=F, warning=F}
 library(dplyr)
@@ -36,7 +37,7 @@ Next we load the LIPP data file, which is saved as a .csv (comma-separated value
 LIPP_Filipino <- read_csv("LIPP_Filipino.csv")
 ```
 
-The `read_csv` function loads this as a tidyverse data table type called a `tibble`, and we get some feedback as a result of doing this which tells us the names and types of variables present in each column. A `double` is a real number which may or may not have a decimal, i.e. some value that we might have measured. A `character` is some text-based value, which usually represents some level of a categorical variable.
+The `read_csv` function loads this as a `tidyverse` data table type called a `tibble`, and we get some feedback as a result of doing this which tells us the names and types of variables present in each column. A `double` is a real number which may or may not have a decimal, i.e. some value that we might have measured. A `character` is some text-based value, which usually represents some level of a categorical variable.
 
 ---
 

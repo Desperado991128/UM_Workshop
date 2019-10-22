@@ -373,12 +373,12 @@ summary {
 <hr />
 <div id="the-languages-in-the-prairies-project-lipp" class="section level2">
 <h2>The Languages in the Prairies Project (LIPP)</h2>
-<p>We will be working with data from Dr. Nicole Rosen’s LIPP corpus which she has been building over the past several years. We will focus on data collected in interviews with Winnipeg residents who are either migrants from the Philippines, or who have Filipino ancestry.</p>
+<p>We will be working with data from Dr. Nicole Rosen’s LIPP corpus which documents language variation in the Prairie provinces. We will focus on data collected in interviews with Winnipeg residents who are either migrants from the Philippines, or who have Filipino ancestry.</p>
 <hr />
 </div>
 <div id="loading-the-data" class="section level2">
 <h2>Loading the data</h2>
-<p>First, we will make sure that some R packages are loaded which we will need later. The <code>dplyr</code> package may give you some warnings which you don’t need to worry about.</p>
+<p>First, we will load some R packages which we will need later. The <code>dplyr</code> package may give you some warnings which you don’t need to worry about.</p>
 <pre class="r"><code>library(dplyr)
 library(readr)
 library(ggplot2)
@@ -402,7 +402,7 @@ library(viridisLite)</code></pre>
 ##   pre_seg = col_character(),
 ##   fol_seg = col_character()
 ## )</code></pre>
-<p>The <code>read_csv</code> function loads this as a tidyverse data table type called a <code>tibble</code>, and we get some feedback as a result of doing this which tells us the names and types of variables present in each column. A <code>double</code> is a real number which may or may not have a decimal, i.e. some value that we might have measured. A <code>character</code> is some text-based value, which usually represents some level of a categorical variable.</p>
+<p>The <code>read_csv</code> function loads this as a <code>tidyverse</code> data table type called a <code>tibble</code>, and we get some feedback as a result of doing this which tells us the names and types of variables present in each column. A <code>double</code> is a real number which may or may not have a decimal, i.e. some value that we might have measured. A <code>character</code> is some text-based value, which usually represents some level of a categorical variable.</p>
 <hr />
 </div>
 <div id="examining-the-data" class="section level2">
