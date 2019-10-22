@@ -136,7 +136,7 @@ Overall, the two distributions look pretty similar to each other, but the female
 
 1. What kinds of things can you *not* do with the *t*-test? Try to think of some questions that you wouldn't be able to answer using the things we've looked at so far.
 
-## ANOVAs
+# ANOVAs
 
 
 
@@ -146,6 +146,5 @@ Overall, the two distributions look pretty similar to each other, but the female
 
 
 
-<center>**[BACK TO WORKSHOP HOME](stats.html)**</center>
 
 </big>
