@@ -488,13 +488,10 @@ library(viridisLite)</code></pre>
 </ol>
 </div>
 </div>
-<div id="anovas" class="section level1">
-<h1><span class="header-section-number">4</span> ANOVAs</h1>
-</div>
 <div id="variables-with-multiple-levels" class="section level1">
-<h1><span class="header-section-number">5</span> Variables with multiple levels</h1>
+<h1><span class="header-section-number">4</span> Variables with multiple levels</h1>
 <div id="exploring-your-variables" class="section level2">
-<h2><span class="header-section-number">5.1</span> Exploring your variables</h2>
+<h2><span class="header-section-number">4.1</span> Exploring your variables</h2>
 <p>The variable of sex/gender only has two levels in our data, male vs. female, so we can use a 2-sample <em>t</em>-test to evaluate the distributions relative to each other. We can get a quick view of the data table by simply entering its name in R.</p>
 <pre class="r"><code>LIPP</code></pre>
 <pre><code>## # A tibble: 163,655 x 14
@@ -534,7 +531,7 @@ library(viridisLite)</code></pre>
 <p>Recall that a <em>t</em> value of +/- 1.96 is usually considered significant, but the result here is much smaller than this. We can also see that the mean values are nearly identical, so the result makes sense.</p>
 </div>
 <div id="variables-with-more-than-two-levels" class="section level2">
-<h2><span class="header-section-number">5.2</span> Variables with more than two levels</h2>
+<h2><span class="header-section-number">4.2</span> Variables with more than two levels</h2>
 <p>We still might want to examine the effect of first language status further – what if we compared speakers of different languages to each other? Let’s see the breakdown of the <code>language</code> variable.</p>
 <pre class="r"><code>table(LIPP$language)</code></pre>
 <pre><code>## 
@@ -587,8 +584,8 @@ library(viridisLite)</code></pre>
 </blockquote>
 <p>We started with a comparison of F2 across the two language statuses in the data, and got a non-significant result. But, when we dug down a little further using the 4-level <code>language</code> variable, we discovered that there were some hidden differences which were significant. Furthermore, we haven’t even explored this completely, as we could compare each language against each other language, rather than only looking at English vs. the others one by one. That would involve three additional <em>t</em>-tests. And if our variable had more than four levels (such as <code>vowel</code>), we would need even more tests. There must be a simpler method! One of the more commonly-used tests which allows a fuller examination of these kinds of variables is the Analysis of Variance, or ANOVA.</p>
 </div>
-<div id="anovas-1" class="section level2">
-<h2><span class="header-section-number">5.3</span> ANOVAs</h2>
+<div id="anovas" class="section level2">
+<h2><span class="header-section-number">4.3</span> ANOVAs</h2>
 <p></big></p>
 </div>
 </div>
