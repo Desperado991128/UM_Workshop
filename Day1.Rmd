@@ -29,24 +29,24 @@ library(ggplot2)
 library(viridisLite)
 ```
 
-Next we load the LIPP data file, which is saved as a .csv (comma-separated values), a common simple-text format for spreadsheets. We will use the `read_csv` function to store this as `LIPP_Filipino`.
+Next we load the LIPP data file, which is saved as a .csv (comma-separated values), a common simple-text format for spreadsheets. We will use the `read_csv` function to store this as an object simply named `LIPP`.
 
 ``` {r}
-LIPP_Filipino <- read_csv("LIPP_Filipino.csv")
+LIPP <- read_csv("LIPP.csv")
 ```
 
 The `read_csv` function loads a .csv as a `tidyverse` data table type called a `tibble`, and we get some feedback as a result of doing this which tells us the names and types of variables present in each column. A `double` is a real number which may or may not have a decimal, i.e. some value that we might have measured. A `character` is some text-based value, which usually represents some level of a categorical variable.
 
 # Examining the data
 
-We will run through a few ways of investigating a dataset such as the LIPP .csv which we loaded earlier as `LIPP_Filipino`. We're going to focus on F2, the second vowel formant which is correlated with vowel front-to-back position, with higher F2 values indicating a more forward position.
+We will run through a few ways of investigating a dataset such as the LIPP .csv which we loaded earlier as `LIPP`. We're going to focus on F2, the second vowel formant which is correlated with vowel front-to-back position, with higher F2 values indicating a more forward position.
 
 ## Histograms
 
 To begin, let's look at the distribution of F2 across all speakers and all vowels. A histogram is the most common way to do this, so let's see 2 ways to make one. The first involves the 'quick-plot' function `qplot()`, which takes limited input and is intended for producing plots when you just want to see the results quickly but don't care so much about tweaking the details. All you need to do is enter the names of the `data table` and the `variable`, separated by a `$`.
 
 ``` {r}
-qplot(LIPP_Filipino$F2)
+qplot(LIPP$F2)
 ```
 
 We get a warning about selecting a better 'binwidth', which is the numerical width of the 'bins' which the F2 values are sorted into, and that make up the stacked columns of the histogram.
@@ -54,14 +54,14 @@ We get a warning about selecting a better 'binwidth', which is the numerical wid
 The second histogram ploting method uses `ggplot()` from the `ggplot2` package. The formula to produce this is a little more complex: we need to specify the data file, then tell it that our x-axis variable is F2, and that we specifically want a histogram.
 
 ``` {r}
-ggplot(data=LIPP_Filipino, aes(x=F2)) +
+ggplot(data=LIPP, aes(x=F2)) +
   geom_histogram()
 ```
 
 We get the same warning here because we didn't specify any bin width, but we can now do so. Let's choose '50', i.e. every 50 Hz will be in a different bin.
 
 ``` {r}
-ggplot(data=LIPP_Filipino, aes(x=F2)) +
+ggplot(data=LIPP, aes(x=F2)) +
   geom_histogram(binwidth = 50)
 ```
 
@@ -70,7 +70,7 @@ ggplot(data=LIPP_Filipino, aes(x=F2)) +
 An alternative to the histogram is the *frequency polygon*, which works much the same way but just produces a contour outline of the data distribution.
 
 ``` {r}
-ggplot(data=LIPP_Filipino, aes(x=F2)) +
+ggplot(data=LIPP, aes(x=F2)) +
   geom_freqpoly(binwidth = 50)
 ```
 
@@ -79,7 +79,7 @@ It's generally thought that men's and women's voices differ in frequency, which 
 >**Note:** Like a lot of linguistic corpora, LIPP divides speakers according to sex/gender into male and female, under the implicit assumption that sex and gender are a singular, binary social category. While there has been some work done in fields such as sociolinguistics to question this assumption, in all honesty it hasn't progressed very far, and even researchers (such as myself) who are prepared to accept that this assumption is wrong, or at least should be interrogated, are often unsure about specifically how this could better be dealt with. Until we have a better answer, and given that there isn't a consensus around this, I will present the LIPP data 'as-is'.
 
 ``` {r}
-ggplot(data=LIPP_Filipino, aes(x=F2)) +
+ggplot(data=LIPP, aes(x=F2)) +
   geom_freqpoly(binwidth = 50) +
   facet_wrap(~ sex)
 ```
@@ -89,7 +89,7 @@ It looks like these distributions are different, but we could be more sure if we
 >**Note:** I have a form of colour blindness which makes it very difficult for me to clearly distinguish a lot of the colours commonly present in plots. All of my examples here will use the ``scale_colour_viridis_d()`` function from the ``viridisLite`` R package, which is designed to *"provide colour maps that are perceptually uniform in both colour and black-and-white. They are also designed to be perceived by viewers with common forms of colour blindness"*. It can still be hard to distinguish large numbers of categories even with this method (see the vowels example below), but it's still better than a lot of the alternatives.
 
 ``` {r F2sex}
-ggplot(data=LIPP_Filipino, aes(x=F2, colour=sex)) +
+ggplot(data=LIPP, aes(x=F2, colour=sex)) +
   geom_freqpoly(binwidth = 50) +
   scale_colour_viridis_d()
 ```
@@ -99,7 +99,7 @@ We can see pretty clearly here that the male and female speakers do have differe
 Just out of curiosity, what if we applied the colour aesthetic to the `vowel` variable instead?
 
 ``` {r}
-ggplot(data=LIPP_Filipino, aes(x=F2, colour=vowel)) +
+ggplot(data=LIPP, aes(x=F2, colour=vowel)) +
   geom_freqpoly(binwidth = 50) +
   scale_colour_viridis_d()
 ```
@@ -111,7 +111,7 @@ We can see that each vowel has, as we might well expect, a unique distribution o
 Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to explicitly test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, split over two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
 
 ``` {r}
-t.test(x=LIPP_Filipino$F2[LIPP_Filipino$sex=="male"], y=LIPP_Filipino$F2[LIPP_Filipino$sex=="female"])
+t.test(x=LIPP$F2[LIPP$sex=="male"], y=LIPP$F2[LIPP$sex=="female"])
 ```
 
 Because the *t* value is quite large and the *p* value is extremely small, we can comfortably reject the null hypothesis, and conclude that the LIPP male vs. female F2 distributions are substantially (*t* value) and significantly (*p* value) different from each other.
@@ -121,7 +121,7 @@ Because the *t* value is quite large and the *p* value is extremely small, we ca
 One more thing -- let's look at these two distributions in a boxplot. These are somewhat simplistic looking plots which highlight certain key aspects of a distribution. Boxplots expect to be provided one continuous variable (often plotted on the *y*-axis) and one categorical variable (on the *x*-axis) -- sometimes, there may be just one set of data, in which case there is no categorical variable to divide the data by.
 
 ``` {r}
-ggplot(data=LIPP_Filipino, aes(y=F2, x=sex)) +
+ggplot(data=LIPP, aes(y=F2, x=sex)) +
   geom_boxplot() +
   scale_colour_viridis_d()
 ```
