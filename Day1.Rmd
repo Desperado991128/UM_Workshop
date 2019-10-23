@@ -84,7 +84,7 @@ ggplot(data=LIPP, aes(x=F2)) +
   facet_wrap(~ sex)
 ```
 
-It looks like these distributions are different, but we could be more sure if we overlaid them on top of each other. We can do this by simply telling `ggplot` to differentiate the colour 'aesthetic' according to the `sex` variable.
+It looks like these distributions are different, but we could have a better visual sense of this if we overlaid them on top of each other. We can do this by simply telling `ggplot` to differentiate the colour 'aesthetic' according to the `sex` variable.
 
 >**Note:** I have a form of colour blindness which makes it very difficult for me to clearly distinguish a lot of the colours commonly present in plots. All of my examples here will use the ``scale_colour_viridis_d()`` function from the ``viridisLite`` R package, which is designed to *"provide colour maps that are perceptually uniform in both colour and black-and-white. They are also designed to be perceived by viewers with common forms of colour blindness"*. It can still be hard to distinguish large numbers of categories even with this method (see the vowels example below), but it's still better than a lot of the alternatives.
 
