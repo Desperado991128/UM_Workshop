@@ -14,21 +14,59 @@ knitr::opts_chunk$set(echo = TRUE)
 #knitr::opts_chunk$set(echo = TRUE, fig.width=6, fig.height=4, fig.path='Figs/')
 ```
 
+# Welcome to the Workshop on Statistics for Linguistics
+
+## Agenda for today
+
+* Who I am and my background
+* Installing the necessary software
+* Loading data
+* Data exploration
+* Descriptive statistics
+* Plotting
+
+## Who I am and my background
+
+I primarily work in sociophonetics, so the data I am most familiar with are acoustic phonetic measurements, and the types of analysis I do typically involve relating those measurements to social factors of various kinds.
+
+I am not a statistician, and in fact I have never taken a proper statistics or research methods course. I won't claim to be able to give you a definitive account of how best to interpret statistical tests, or how and why one test might be superior to another for some particular dataset. 
+
+What I can do is describe to you how to manage linguistic data in R, how to apply a variety of statistical functions and tests to that data, and how to produce output in a variety of forms which are usable in presentations, talks, papers, etc.
+
+## Installing the necessary software
+
+The first and most essential software package you require is R itself, which is "a free software environment for statistical computing and graphics". If you don't have R installed, go to <https://muug.ca/mirror/cran/> and download the appropriate version for your operating system:
+
+```{r echo = FALSE, out.width = "100%"}
+knitr::include_graphics("download_r.png")
+```
+
+If you already have R installed, it would be a good idea to open it and make sure it is updated. On a Mac, from the menu bar click:
+
+>**R > Check For R Updates**
+
+I'm not 
+
+
+
+
+
+
+
 # The Languages in the Prairies Project (LIPP)
 
 We will be working with data from Dr. Nicole Rosen's LIPP corpus which documents language variation in the Prairie provinces. We will focus on data collected in interviews with Winnipeg residents who are either migrants from the Philippines, or who have Filipino ancestry. Of course, all of the techniques we will be using could apply to any type of linguistic (or other) data.
 
 # Loading the data
 
-First, we will load some R packages which we will need later. The `dplyr` package may give you some warnings which you don't need to worry about.
+First, we will install and load some R packages which we will need later.
 
 ```{r, message=F, warning=F}
-library(dplyr)
-library(readr)
-library(ggplot2)
-library(ggpubr)
+if(!require(tidyverse)){install.packages("tidyverse")}
+if(!require(viridisLite)){install.packages("viridisLite")}
+
+library(tidyverse)
 library(viridisLite)
-library(car)
 ```
 
 Next we load the LIPP data file, which is saved as a .csv (comma-separated values), a common simple-text format for spreadsheets. We will use the `read_csv` function to store this as an object simply named `LIPP`.
@@ -51,66 +89,80 @@ To begin, let's look at the distribution of F2 across all speakers and all vowel
 qplot(LIPP$F2)
 ```
 
-We get a warning about selecting a better 'binwidth', which is the numerical width of the 'bins' which the F2 values are sorted into, and that make up the stacked columns of the histogram.
+We get a warning about selecting a better 'binwidth', which is the numerical width of the 'bins' which the F2 values are sorted into, and that make up the stacked columns of the histogram. We can safely ignore this for the time being.
 
-The second histogram ploting method uses `ggplot()` from the `ggplot2` package. The formula to produce this is a little more complex: we need to specify the data file, then tell it that our x-axis variable is F2, and that we specifically want a histogram.
+The second histogram ploting method uses `ggplot()` from the `ggplot2` package, part of `tidyverse`. The formula to produce this is a little more complex: we need to specify the data file, and then tell it that our x-axis variable is F2, and that we specifically want a histogram. The x-axis selection is made inside the `ggplot()` call using the `aes()` function. This stands for "aesthetic mappings" and has to do with how the data is mapped onto visual properties of plots. Not also that the specific type of plot, in this case with the `geom_histogram()` function, is on a separate line preceded by a `+` sign. This type of structure is particular to `ggplot2`, and from my understanding is probably going to change at some point in the future.
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_histogram()
 ```
 
-We get the same warning here because we didn't specify any bin width, but we can now do so. Let's choose '50', i.e. every 50 Hz will be in a different bin.
+This produces a 100% identical plot as we got using `qplot()`. We also get the same warning here because we didn't specify any bin width, but we can now do so. Let's choose '50', i.e. every 50 Hz will be in a different bin. This is done inside the `geom_histogram()` function using the `binwidth` argument.
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_histogram(binwidth = 50)
 ```
 
+As an aside, you can find out all of the available options and structures for a given function by either entering it in the search box at the upper right of Rstudio, or by typing a `?` followed by the name of the function at the prompt in the Console. This will pull up the Description page for that function under the Help tab in the upper right.
+
+```{r}
+?ggplot
+```
+
 ## Frequency plots
 
-An alternative to the histogram is the *frequency polygon*, which works much the same way but just produces a contour outline of the data distribution.
+An alternative to the histogram is the *frequency polygon*, which works much the same way but instead produces a contour outline of the data distribution. I'm also going to apply one of the available `ggplot()` themes just because I can! This is done in the same way that other functions are added into a `ggplot` call, by separating each function by a `+`.
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
-  geom_freqpoly(binwidth = 50)
+  geom_freqpoly(binwidth = 50) +
+  theme_light()
 ```
 
 It's generally thought that men's and women's voices differ in frequency, which affects not only fundamental frequency (i.e. pitch) but also the upper harmonics, which vowel formants consist of. Does our data reflect this? One way to tell is to 'facet' the separate distributions for each sex.
 
 >**Note:** Like a lot of linguistic corpora, LIPP divides speakers according to sex/gender into male and female, under the implicit assumption that sex and gender are a singular, binary social category. While there has been some work done in fields such as sociolinguistics to question this assumption, in all honesty it hasn't progressed very far, and even researchers (such as myself) who are prepared to accept that this assumption is wrong, or at least should be interrogated, are often unsure about specifically how this could better be dealt with. Until we have a better answer, and given that there isn't a consensus around this, I will present the LIPP data 'as-is'.
 
+To facet our data by some variable, we add the `facet_wrap()` function under the `ggplot` call. Inside this, we put a tilde followed by the variable we wish to facet by.
+
+>If you are wondering if you can facet by more than one variable, the answer is yes!
+
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_freqpoly(binwidth = 50) +
-  facet_wrap(~ sex)
+  facet_wrap(~ sex) +
+  theme_light()
 ```
 
-It looks like these distributions are different, but we could have a better visual sense of this if we overlaid them on top of each other. We can do this by simply telling `ggplot` to differentiate the colour 'aesthetic' according to the `sex` variable.
+It looks like these distributions are different, but we could have a better visual sense of this if we overlaid them on top of each other. We can do this by simply telling `ggplot` to differentiate the colour 'aesthetic mapping' according to the `sex` variable, rather than faceting the data. Sometimes you need to play around with some of the different options in order to determine the best visualization method for what you are trying to display.
 
 >**Note:** I have a form of colour blindness which makes it very difficult for me to clearly distinguish a lot of the colours commonly present in plots. All of my examples here will use the ``scale_colour_viridis_d()`` function from the ``viridisLite`` R package, which is designed to *"provide colour maps that are perceptually uniform in both colour and black-and-white. They are also designed to be perceived by viewers with common forms of colour blindness"*. It can still be hard to distinguish large numbers of categories even with this method (see the vowels example below), but it's still better than a lot of the alternatives.
 
 ``` {r F2sex}
 ggplot(data = LIPP, aes(x = F2, colour=sex)) +
   geom_freqpoly(binwidth = 50) +
-  scale_colour_viridis_d()
+  scale_colour_viridis_d() +
+  theme_light()
 ```
 
 We can see pretty clearly here that the male and female speakers do have different distributions for F2, although the male distribution falls almost entirely inside the female distribution.
 
-Just out of curiosity, what if we applied the colour aesthetic to the `vowel` variable instead?
+Just out of curiosity, what if we applied the colour aesthetic mapping to the `vowel` variable instead?
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2, colour=vowel)) +
   geom_freqpoly(binwidth = 50) +
-  scale_colour_viridis_d()
+  scale_colour_viridis_d() +
+  theme_light()
 ```
 
 We can see that each vowel has, as we might well expect, a unique distribution of F2 values. We'll come back to look at vowel differences later on.
 
 ## *t*-tests
 
-Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to explicitly test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, split over two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
+Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to formally test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, across two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
 
 ``` {r}
 t.test(x = LIPP$F2[LIPP$sex == "male"], 
@@ -121,15 +173,16 @@ Because the *t* value is quite large and the *p* value is extremely small, we ca
 
 ## Boxplots and descriptive statistics
 
-Let's look at these two distributions in a boxplot. These are somewhat simplistic looking plots which highlight certain key aspects of a distribution. Boxplots expect to be provided one continuous variable (often plotted on the *y*-axis) and one categorical variable (on the *x*-axis) -- sometimes, there may be just one set of data, in which case there is no categorical variable to divide the data by.
+Let's look at these two distributions in a boxplot. These are a type of plot used to highlight certain key aspects of a distribution. Boxplots expect to be provided one continuous variable (often plotted on the *y*-axis) and one categorical variable (on the *x*-axis) -- sometimes, there may be just one set of data, in which case there is no categorical variable to divide the data by.
 
 ``` {r}
 ggplot(data = LIPP, aes(y = F2, x = sex)) +
   geom_boxplot() +
-  scale_colour_viridis_d()
+  scale_colour_viridis_d() +
+  theme_light()
 ```
 
-What is indicated in the boxplot? The box itself contains the central 50% of the distribution, and the central line indicates the median (not the mean!) value, i.e. the value exactly in the centre of the range. The two extended lines or "whiskers" mark the range of the distribution beyond which observations are considered to be "outliers", which are marked with dots. The whiskers are each 1.5 times the distance of the box itself, i.e. 1.5 times the central 50% of the range (this is the interquartile range or IQR). Note that there appear to be a lot more high-frequency outliers than low-frequency ones, for both males and females.
+What is indicated in the boxplot? The rectangular box itself contains the central 50% quantity of the distribution, and the central line indicates the median (not the mean!) value, i.e. the value exactly in the centre of the data. The two extended lines or "whiskers" mark the range of the distribution beyond which observations are considered to be "outliers", which are marked with dots. The whiskers are each 1.5 times the distance of the box itself, i.e. 1.5 times the central 50% of the range (this is the interquartile range or IQR). Note that there appear to be a lot more high-frequency outliers than low-frequency ones, for both males and females.
 
 Overall, the two distributions look pretty similar to each other, but the female speakers' frequencies are shifted higher by 200-300 Hz. This both fits with our intuition and knowledge about sex-based speech differences, and our previous examination of the data.
 
