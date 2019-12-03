@@ -43,9 +43,40 @@ knitr::include_graphics("download_r.png")
 
 If you already have R installed, it would be a good idea to open it and make sure it is updated. On a Mac, from the menu bar click:
 
->**R > Check For R Updates**
+>`R > Check For R Updates`
 
-I'm not 
+(I'm not sure of the procedure for Windows; hopefully it's easy to follow)
+
+After installing R, you will need to install RStudio:
+
+>RStudio is an integrated development environment (IDE) for R. It includes a console, syntax-highlighting editor that supports direct code execution, as well as tools for plotting, history, debugging and workspace management.
+
+It's possible to do everything we will be doing in the workshop using just R on its own, but RStudio makes working with R a lot easier in a variety of ways. Get R here https://rstudio.com/products/rstudio/download/ and install it.
+
+```{r echo = FALSE, out.width = "100%"}
+knitr::include_graphics("download_rstudio.png")
+```
+
+Again, if you already have RStudio you should check for updates. On a Mac, go to: 
+
+>`Help > Check for Updates`
+
+## Getting the workshop files
+
+I am planning to run the entire workshop inside RStudio rather than using Powerpoint or something like that. That way, you will be working hands-on with R the entire time, which will help you to be more familiar with things. I can also adapt the files I am using on the fly during the workshop, and later save those updates for everyone to access.
+
+The files I will be using in the workshop are located here: <https://github.com/onosson/UM_Workshop>
+
+```{r echo = FALSE, out.width = "100%"}
+knitr::include_graphics("github.png")
+```
+
+From that page, click `Clone or download` and then select `Download ZIP` (most people) or `Open in Desktop` if you are already on GitHub and use a version control app like GitHub Desktop (if you don't know/understand what that is, it's basically like Dropbox for coders).
+
+
+
+
+
 
 
 
