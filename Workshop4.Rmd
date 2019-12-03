@@ -1,5 +1,5 @@
 ---
-title: "Part Four: Generalized Linear Modeling and Mixed Effects Modeling"
+title: "Part Three: Correlation and Linear Regression"
 subtitle: "Workshop on Statistics for Linguistics"
 author: "Sky Onosson, University of Manitoba"
 output: 
@@ -24,78 +24,300 @@ if(!require(viridisLite)){install.packages("viridisLite")}
 
 library(tidyverse)
 library(viridisLite)
+library(broom)
 
 LIPP <- read_csv("LIPP.csv")
 ```
 
-# Generalized Linear Modeling
+# Correlation
 
-Generalized Linear Models (GLMs) are essentially an extension of linear models which do not assume a normal distribution for the outcome/effect/response variable, or allow it to be categorical/non-continuous. We will just look at one type of GLM: logistic regression.
+Correlation and regression are similar analytic methods with very distinct assumptions. *Correlation* assumes a non-causal relationship -- or rather, does *not* assume any causal relationship between variables. Correlations between continuous numerical variables can be conducted with the `cor()` function in R, providing a value between 0 and 1, with 1 being perfect correlation. The closer to 0, then, the weaker the correlation. Some analyses take >0.7 as a *strong* correlation, others >0.5, and many use <0.2 or <0.3 as a *weak* correlation -- these are all imprecise terms and are best used in comparison with other results.
 
-Logistic regression is a GLM where the outcome variable is **categorical** and, specifically, **binary** in nature -- that is, it is one of two types. The GLM code in this case is pretty finicky and relies on the levels being encoded as *exactly* 0 and 1 for the two binary levels. This means that if your data coding uses terms for the two levels -- such as e.g. "female" and "male" -- these need to be recoded on the fly. Luckily, this is fairly easy to do using the `mutate()` function in `dplyr`.
-
-As an illustration of logistic regression, let's look at the difference in duration between English lax vs. tense monophthongs. Lax vowels such as /ɪ, ɛ/ tend to have briefer durations than tense vowels such as /i, e/.
-
-> **Note**: an important exception to this is the vowel /æ/ which is typically counted as a lax vowel and yet tends to have a longer duration more similar to tense vowels.
-
-The code here is a little more involved than many previous examples. First, becuase three categories of vowel types are encoded in the original dataset -- *lax*, *tense*, and *diphthong* -- I set up a vector `monophthongs` which only includes the first two of these. Next, a `filter()` removes all non-monophthongs, as well as the vowels /æ/ (see note above) and schwa from the analysis. Next, I `mutate()` the `vowel_type` variable into a new variable simply called `type` by wrapping `vowel_type` inside both `as.factor()` (so R knows we are dealing with a factor -- this is sometimes critical) and `as.integer()`. The latter converts the various levels of `vowel_type` into integers, which R does beginning at 1 and increasing from there. Because we eliminated the *diphthong* level, there are only two, which will be categorized as 1 and 2 by `as.integer()`. However, because the `glm()` function will expect only 0 and 1 as input levels, the final step here is to subtract 1 from the `as.integer()` call inside the `mutate()` function. This finally provides the correct input for `glm()`. We indicate that the newly-created `type` variable is the first (categorical) factor, and `dur` (duration in seconds) is the second (continuous) factor, that we wish to perform a "family" analysis from the binomial (that is, logistic) class, and that the data will be drawn from the `dplyr` "pipe" via the "." -- we finally "pipe" this into a `summary()` function for the final output! 
-
-I have also included two plot calls -- a boxplot and a frequency graph -- using the same `filter()` function to illustrate visually the difference between the two groups of vowels. For each plot I have added a *1000 multiplier to the duration values to convert from seconds to milliseconds, and converted the duration axis to a logarithmic scale so that the lower range of the duration values (where most of the data lies) is more clear.
+As an illustration, we might compare the F2 and F1 values across the LIPP dataset, i.e. aggregating all vowels as we have been doing. We should probably expect some sort of correlation, but given the number of vowels in English and their associated variation, we might not expect a strong correlation overall. There are a few methods of performing correlations -- Pearson's correlation coefficient assumes normal distributions (i.e. it is parametric), and Spearman's is non-parametric. Let's try both and see the result.
 
 ```{r}
-monophthongs <- c("lax", "tense")
-LIPP %>%
-  filter(vowel_type %in% monophthongs,
-         vowel != "AE",
-         vowel != "AH") %>% 
-  mutate(type = as.integer(as.factor(vowel_type))-1) %>% 
-  glm(type ~ dur, family = binomial, data = .) %>% 
-  summary()
+cor(LIPP$F2, LIPP$F1, method = "pearson")
+cor(LIPP$F2, LIPP$F1, method = "spearman")
+```
 
-LIPP %>%
-  filter(vowel_type %in% monophthongs,
-         vowel != "AE",
-         vowel != "AH") %>% 
-  ggplot(aes(vowel_type, dur*1000)) +
-  scale_y_log10() +
-  geom_boxplot()+ 
-  theme_light()
+The two coefficients give remarkably similar results, indicative of a fairly weak correlation. Even if the distributions are not normal, the CLT tells us that for a large dataset such as we are working with, we should expect parametric tests to give similar results as non-parametric, and this is borne out here. 
 
-LIPP %>%
-  filter(vowel_type %in% monophthongs,
-         vowel != "AE",
-         vowel != "AH") %>% 
-  ggplot(aes(x=dur*1000, colour=vowel_type)) +
-  geom_freqpoly() +
-  scale_colour_viridis_d() +
-  scale_x_log10() + 
+What do these results tell us? F1 and F2 are correlated, which means they tend to vary in a linked way, but the correlation is weak so there are many exceptions to this. We of course already know that this is because we are aggregating all of the vowels together, and should expect this correlation to be much stronger when considering each vowel individually. We can test this using the `dplyr` functions `group_by()` and `summarize()`. `group_by()` allows us to specify one or more variables by which the dataset will be segregated into groups, and each group will then be fed individually into the following functions down the "pipe" (the `%>%` operator). `summarize()` will then take the individual groups provided by `group_by()` and perform the specified function, in this case `cor()` using Spearman's coefficient (we will assume that at least some of these distributions are non-parametric).
+
+>**Note**: The vowels in the LIPP data file are indicated using the ARPABET system, which uses two-letter codes for each vowel.
+
+| ARPABET | IPA |
+|---|---|
+|AA|ɑ|
+|AE|æ|
+|AH|ə, ʌ|
+|AO|ɔ|
+|AW|aw|
+|AY|aj|
+|EH|ɛ|
+|ER|ɚ|
+|EY|e(j)|
+|IH|ɪ|
+|IY|i(j)|
+|OW|o(w)|
+|OY|ɔj|
+|UH|ʊ|
+|UW|u(w)|
+
+```{r}
+LIPP_cor <- LIPP %>% 
+  group_by(vowel) %>% 
+  summarize(coefficient = cor(F1, F2, method = "spearman"))
+LIPP_cor
+```
+
+We can see that for some vowels there is a relatively stronger correlation: AA (0.38), AW (0.34), OW (0.47) and OY (0.44). For others, the correlation is much closer to zero: AE (0.03), EH (0.04), EY (0.05), IH (~0), etc. This is much easier to visualize if we plot the correlation coefficients by vowel, in ascending order.
+
+```{r}
+ggplot(data = LIPP_cor, 
+       aes(x = reorder(vowel, coefficient), y = coefficient)) +
+  geom_point() + 
   theme_light()
 ```
 
-The two plots both illustrate fairly well how the distributions of lax vs. tense vowels differ. The logistic regression output produces a few pieces of information which we can use to determine the statistical difference between the two vowel types. The *z* value is an indication of the relative strength of the model, while the familiar *p* value indicates the likelihood that this score is accurate for the population the sample is drawn from. We also have an AIC score reported -- this is the Akaike Information Criterion, which is another relative value which is difficult to evaluate simply on its own. The AIC is generally used when comparing different models to determine which is a more comprehensive analysis of the data -- a lower AIC typically indicates a stronger model.
+We can see quite clearly that there is a set of vowels -- largely but not exclusively lax vowels -- with a relatively low correlation between F1 and F2. There are two vowels with medial coefficients -- AY and ER. And, there are a set of vowels with coefficients between 0.3 and 0.6, which is relatively high within the entire group. Recall that considering the overall relationship between formants without segregating by vowel gave us only a relatively low coefficient -- we needed to consider the vowels individually to get a better picture of how the formants are correlated in the data.
 
-As I don't have a lot of experience using logistic regression, or much more to say about it beyond this, let's move on to the next topic.
+# Linear Regression
 
-# Mixed-Effects Modeling
+Linear regression differs from simple correlation in that it is used to test the hypothesis that two variables are correlated in a **causal** relationship. This requires one variable to influence the other but not vice versa -- in other words, the linear model needs to be formulated so that one variable is selected as *independent* of the other, i.e. it is the *cause* or *predictor*, and the other is *dependent* on the first, i.e. it shows the *effect*. In a lot of sociolinguistic research, this is the preferred type of analysis, as it provides a lot of explanatory power. If we can demonstrate a causal relationship, then we can argue for an explanation wherein one factor (i.e. the predictor variable) drives the variation (the effect) which we observe within our data.
 
-One of the most common methods of statistical analysis in fields like sociolinguistics is mixed-effects (regression) modeling (MEM). As the full name implies, this is a type of regression model similar to linear regression, but with the addition of "mixed effects". As noted by Sonderegger et al., MEMs offer a range of benefits:
+Conducting a linear regression is relatively straightforward. Let's revisit the sex/gender differences which we previously observed for F2 as a test. To recall, we observed differences between male and female speakers' F2 distributions, as indicated with frequency plots, boxplots, and a *t*-test, 
 
-> * More than one grouping unit can be included in the same model
-* Unequal number of observations per level is OK
-* **Explicitly model variability** among levels of the same grouping factor
-    * Ex: By participant variability ("individual differences")
-    * This means the analyst can explore and test questions about the variability itself (as opposed to effects averaging across participants, etc.), which is not possible using RM-ANOVA, or other methods we've covered so far.
+``` {r F2sex}
+ggplot(data = LIPP, aes(x = F2, colour=sex)) +
+  geom_freqpoly(binwidth = 50) +
+  scale_colour_viridis_d() + 
+  theme_light()
 
-The suitability of MEMs for statistical analysis of data from variationist sociolinguistics and related fields should be quite apparent given these points.
+ggplot(data = LIPP, aes(y = F2, x = sex)) +
+  geom_boxplot() +
+  scale_colour_viridis_d() + 
+  theme_light()
+
+t.test(x = LIPP$F2[LIPP$sex == "male"], 
+       y = LIPP$F2[LIPP$sex == "female"])
+```
+
+What is the relationship between sex/gender and F2, given these observed differences? I have never seen it proposed that F2 differences affect a speaker's sex/gender! (Although, they **could** perhaps affect our **perception** of gender -- but that is an entirely different question). It seems much more reasonable to propose that speaker sex/gender influences their F2 values -- posited differences in formant values between male & female speakers are the very reason that sociophoneticians have tended to either segregate speakers by sex/gender and/or normalize formant values across males and females. This seems like an obvious point, but in formulating the linear model, we need to consider which variable is the independent vs. dependent factor. Under the second model, sex/gender is independent of F2, but F2 is dependent on sex/gender which we suspect causes the differences in distributions. Let's try a linear model which captures this hypothesis.
+
+```{r}
+lm(F2 ~ sex, LIPP)
+```
+
+Because we used a 2-level categorical independent variable (or predictor), the model picks one level as a base.
+
+> **Note**: I'm pretty sure R does this by just selecting the first level in alphabetical order, and certainly there is nothing implied by which level is compared against which.
+
+The base level, in this speakers categorized as female, provides the intercept level -- this is the F2 value predicted (on average) for all female speakers. Then, the predicted difference in F2 for male speakers is provided. In this case, it indicates that male's have lower average F2 values, by about 217 Hz.
+
+There is a lot more information in the linear model than is initially presented, however. To view this, you need to wrap the `lm()` function inside the `summary()` function.
+
+```{r}
+summary(lm(F2 ~ sex, LIPP))
+```
+
+There are several useful pieces of information here. An important caveat: my analysis here is based on my limited understanding of the math involved in linear regressions. The information under "residuals" provides details on how the F2 distribution is positioned relative to the linear model. In this case, we see that the IQ (interquartile) range is somewhat circumscribed at <300 Hz around the median, but the minimum and maximum values are quite far away (some of these extreme values may be due to instrumental error, but we will ignore that possibility).
+
+The coefficients include the basic linear model information we obtained earlier: the intercept for female speakers, and the difference from this for male speakers. We also get a S.E. value (measure of variability), *t* value (measure of the relative "power" or strength of the determination), and *p* value (statistical significance) for each category of speakers. 
+
+Further down, residual standard error is a measure of overall variability in the entire dataset (ignoring sex differences in this case), R-squared values report the proportion of variation (out of 1.0) captured by the model, and the *F*-statistic is a relative measure of the "goodness of fit" of this model relative to other potential models -- in this case, it simply compares the provided model to the null hypothesis, which would be that F2 and sex are uncorrelated. There is also a *p* value for the *F*-statistic.
+
+Interpretation of all of this information is difficult and somewhat subjective. In particular, the *t* and *F* values are best interpreted in relative terms -- with nothing else to compare against, we can't really say whether these particular values, however arbitrarily high or low they may be, indicate a relatively strong/powerful effect or not. *p* values do help us report significance, which means the likelihood that our results are accurate and not due to change. All of the resulting *p* values here are about as low as is possible, meaning we can be extremely confident that this test produced reliable results -- in other words, F2 *is* predicted by speaker sex, to some degree. R-squared (or just R2) **does** provide us with something more useful to report. This value indicates something about the amount of variation which is captured by our analysis, with zero indicating that none of the variation is captured, and 1.0 indicating that all of the variation is perfectly captured (i.e. all data would fall at the indicated per-sex values with no variation at all). Our R2 value is around 0.6, meaning that only 6% of the variation is perfectly captured by the model. This is quite small, so how is it significant? While we might like more variation to be caught up in this per-sex difference, this result points to an important reality -- humans are incredibly variable, and variation between groups/contexts is often incredibly subtle, and even yet it can be consistent! That's the kind of result that we are seeing here.
+
+There is sometimes some confusion between linear models and ANOVAs, which look very similar in formulation. Let's see what an ANOVA of F2 by speaker sex produces, along with the accompanying call for a Tukey HSD test.
+
+```{r}
+aov(F2 ~ sex, LIPP)
+TukeyHSD(aov(F2 ~ sex, LIPP))
+```
+
+The ANOVA tells us, like the linear regression earlier, that male speakers' F2 differs from female speakers' by -217.7 Hz on average, and produces a *p* value (which differs from that of the linear model, although both are unquestionably significant). What the ANOVA does *not* provide is a predicted value for F2, as it only tests correlation between F2 and the different levels of speaker sex. Sometimes ANOVA is described as a special case of linear regression, but from my understanding this is not exactly true mathematically, and it is especially not true when it comes to the purpose behind each, and the type of output which each can produce.
+
+> **Note:** The differences and different usages between correlation and regression techniques are nicely summarized in the following: *"Linear regression and correlation are similar and easily confused. In some situations it makes sense to perform both calculations. Calculate linear correlation if you measured both X and Y in each subject and wish to quantity how well they are associated. Select the Pearson (parametric) correlation coefficient if you can assume that both X and Y are sampled from Gaussian* [NB: normal] *populations. Otherwise choose the Spearman nonparametric correlation coefficient. Don't calculate the correlation coefficient (or its confidence interval) if you manipulated the X variable. Calculate linear regressions only if one of the variables (X) is likely to precede or cause the other variable (Y). Definitely choose linear regression if you manipulated the X variable. It makes a big difference which variable is called X and which is called Y, as linear regression calculations are not symmetrical with respect to X and Y. If you swap the two variables, you will obtain a different regression line. In contrast, linear correlation calculations are symmetrical with respect to X and Y. If you swap the labels X and Y, you will still get the same correlation coefficient."* Source: https://www.graphpad.com/support/faqid/1790/
+
+So far we have looked at linear regression with one continuous variable (F2 in Hz) and one categorical variable (speaker sex/gender). This is fine and not uncommon at all, but if we want to allow a visual analysis of what the linear model is telling us, it is more helpful to use two continuous variables. One of the other social/demographic variables which we have in the LIPP dataset is continuous -- `year` (of birth). One of the ongoing changes in Canadian English is /u/-fronting, where the position of the vowel /u/ in many environments is progressively fronted, which correlates with higher F2 values. Let's try a linear regression of year as the predictor against F2 of the /u/ vowel only -- I'm also going to restrict this to L1 English speakers only, as we shouldn't necessarily expect this change to be occurring for those who acquired English as adults.
+
+> To achieve these restrictions, I'm running the LIPP data through the `filter()` function in `dplyr`. When the data is "piped" into the `lm()` function, we need to include a "." in place of the source dataset, which simply tells it to accept the data "coming down the pipe". This can be very unintuitive, and I've made the mistake of excluding this many times!
+
+```{r}
+LIPP %>% 
+  filter(vowel == "UW", 
+         lang_status == "L1") %>% 
+  lm(F2 ~ year, .) %>% 
+  summary()
+```
+
+It turns out that year of birth does indeed predict F2 values for /u/, which increase over time to a small extent -- there is, however, a lot of variability (see the R2 value). We can plot the distribution and the linear model together quite easily by combining a scatterplot of F2 values by year of birth and a linear model. `ggplot()` allows this by using two "geometries" together: `geom_jitter` plots the individual tokens' F2 values, with a bit of random variation thrown in to avoid some visual overlap; and, `geom_smooth` is used for linear regressions and other similar functions. Note that the F2 points appear in "columns" by year because we don't have a completely continuous dataset of speakers here, i.e. there are many gaps in the year variable.
+
+```{r}
+LIPP %>% 
+  filter(vowel == "UW", 
+         lang_status == "L1") %>% 
+  ggplot(aes(year, F2)) + 
+  geom_jitter() +
+  geom_smooth(method = "lm", col = "red") + 
+  theme_light()
+```
+
+As we see, there is truly *massive* variation around the linear model -- and yet! the model still provides some predictive power within this variation. Is this a great result? Probably not, but we are also doing a very broad sweep of the data. We haven't restricted our /u/ tokens by context, for example -- /u/-fronting isn't present in all phonological environments, but is known to occur after coronal consonants. We can add another restriction to our filter to only include /u/ with a preceding segment which is one of the coronals: /t, d, s, z, n/, by setting these up as a vector using the "combine" `c()` function, and the `%in%` operator within the `filter()` function.
+
+```{r}
+coronals <- c("T","D","S","Z","N")
+
+LIPP %>% 
+  filter(vowel == "UW", 
+         lang_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .) %>% 
+  summary()
+
+LIPP %>% 
+  filter(vowel == "UW", 
+         lang_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .) %>% 
+  ggplot(aes(year, F2)) + 
+  geom_jitter() +
+  geom_smooth(method = "lm", col = "red") + 
+  theme_light()
+```
+
+If we compare this to the previous model, we see that the *t* and *F* values all increased, all of the *p* values got substantially smaller, and the R2 value increased, albeit still being fairly low at 2.8%. In other words, we have improved the model by restricting the analysis to /u/ following coronal consonants.
+
+> As an aside, why is the intercept so low in both models? The first model produced an intercept of nearly -8000, and the second was an enormous -18000! What does this indicate? We have to think of what the model is measuring. The intercept is based on analyzing the effect of year of birth on F2 values, and is *regressing* from the observed data down to a zero value for *x*, which is the predictor, in this case year of birth. So the model is providing a predicted F2 value for people born in the year zero! And that value, in this second model, is -18006 Hz! This makes absolutely no sense in reality, as we know no human can produce negative Hz formants. The model indicates that this value increases by about 10 Hz per year on average. Carrying this forward by 2019 years, gives us -18006 + 2019*10 = 2,184 Hz which is much more reasonable. So, there is a real problem in linear models, in that they might only give us realistic answers within a certain range for some variable. Vowel formants occur only within restricted ranges of Hz values, and yet a linear model would predict potential formant values both arbitrarily large and small, which could never be observed in reality.
+
+There are further plotting options we can explore with linear models. This time rather than "piping" all of the data together, I'll set up some objects in the R environment which we can refer back to. This can be an easier way of managing things when you have to reuse the same code several times, although it has the disadvantage of being somewhat less transparent.
+
+First, we will set up an object called `F2year_lm` which is a linear model of F2 by year of birth, using the same `filter()` to isolate only tokens of /u/ by L1 English speakers in post-coronal position.
+
+```{r}
+F2year_lm <- LIPP %>% 
+  filter(vowel == "UW", 
+         lang_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .)
+```
+
+Next, we will use the `augment()` function from the `broom` library, which generates a data frame using output from the linear model function -- we'll assign this to an object called `F2year_table`, which we can then view.
+
+```{r}
+F2year_table <- augment(F2year_lm)
+
+F2year_table
+```
+
+For each observation, we have the reported `F2` value, the `year` of birth of the speaker, the `.fitted` value (i.e. the mean as determined from the linear model), the `.se.fit` (standard error), the `.resid` (the distance the observation is from the fitted value), and some other values that we won't discuss. If we create a plot of the first two columns (and add our linear line using `geom_smooth()`), we get essentially the same output as the preceding plot
+
+> Note that the positions of each point are non-identical. This is because `geom_jitter()` generates random positions each time it is run -- you can try running the code below repeatedly to observe that the positions all shift slightly each time.
+
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_jitter() +
+  geom_smooth(method = "lm", col = "red") +
+  theme_light()
+```
+
+We can, however, now do some extended plotting using the `F2year_table` object which we created with `augment()`. I'll go through this step by step for clarity. We start with a plot of the individual points using `geom_jitter()`.
+
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_jitter() +
+  theme_light()
+```
+
+Next, we added the fitted values from the `.fitted` column, which we all assign a unique shape to so that they stand out -- I've also increased the size of these points and coloured thenm red, as they are still easily obscured by the quantity of points involved.
+
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_jitter() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, colour = "red") +
+  theme_light()
+```
+
+We can next add line segments to connect 
 
 
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted)) +
+  geom_jitter() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  theme_light()
+```
 
+This method isn't perfect in this case -- due to the use of `geom_jitter`, the points are not where they should be on the x-axis, so don't line up with the segment ends. We can correct this by using `geom_point()` instead, although this results in most of the points overlapping invisibly.
 
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted)) +
+  geom_point() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  theme_light()
+```
 
+Let's add in the smooth linear regression line from before -- I'll also fade the residual segment lines by adjusting their alpha value, and colour them blue.
 
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted), alpha = .1, col = "blue") +
+  geom_point() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  geom_smooth(method = "lm", col = "red") +
+  theme_light()
+```
 
+We can also modify the residuals themselves to indicate their position relative to the linear regression -- this is really helpful for indicating variance visually. There are a few ways to do this, but I'll do it here using colour. We set the colour value inside the `aes()` of `geom_point()` to be the `abs()` (absolute value -- ignoring the positive/negative sign) of the `.resid` column, which tells us how far away each point is from the regression line. I'll scale the colours as usual with the `viridisLite` package -- here the `scale_colour_viridis_c()` function is used as the `_c` is for continuous values (e.g. the F2 values we are plotting). The result is that colours closest to the regression line are darker-hued, while those furthest away are lighter. The result is a colourful plot where the colour isn't merely superfluous, but indicates how the residuals are distributed.
 
+```{r}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted), alpha = .1, col = "blue") +
+  geom_point(aes(col = abs(.resid))) +
+  scale_colour_viridis_c() +
+  guides(colour = FALSE) +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  geom_smooth(method = "lm", col = "red") +
+  theme_light()
+```
 
+This entire plot can actually be created using our original method where everything is "piped" down from the LIPP dataframe -- the point of creating the objects for the linear model and then the table of that data using `augment()` was to show what data is available inside the `lm()` call. Many R functions generate data that isn't readily apparent, and it would be difficult to otherwise know that the appropriate terms to enter in the code below are `.fitted` and `.resid`, for example.
 
+```{r}
+LIPP %>% 
+  filter(vowel == "UW", 
+         lang_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .) %>% 
+  ggplot(aes(year, F2)) + 
+  geom_segment(aes(xend = year, yend = .fitted), alpha = .1, col = "blue") +
+  geom_point(aes(col = abs(.resid))) +
+  scale_colour_viridis_c() +
+  guides(colour = FALSE) +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  geom_smooth(method = "lm", col = "red") +
+  theme_light()
+```
+
+As an aside, I'm going to run one more linear model on two of the few available continuous variables in the data: F1 and duration. Because F1 is correlated with vowel height, a high F1 correlating with a low vowel position or an open jaw articulation, we might reasonably hypothesize that short-duration vowels would allow less time for jaw opening, which would affect vowel height position (they would be higher) and thus F1 values (which would be lower). In other words, we should suspect that brief vowels have lower on average F1 values, with duration being the driver/predictor/cause of the effect. And I'm going to add one more element to the plot this time: a "smooth" line (blue) not based on a linear regression (red). I won't discuss this right now, but compare the visual results and try to interpret what you see. I've also included modification of both the colour and shading of the plotted points.
+
+```{r}
+LIPP %>% 
+  lm(F1 ~ dur, .) %>% 
+  summary()
+
+LIPP %>%
+  lm(F1 ~ dur, .) %>% 
+  ggplot(aes(dur, F1)) + 
+  geom_point(aes(col = abs(.resid), alpha = abs(.resid))) +
+  scale_colour_viridis_c() +
+  guides(colour = FALSE, alpha = FALSE) +
+  geom_smooth(method = "lm", col = "red") +
+  geom_smooth(col = "blue") + 
+  theme_light()
+```
 
 </big>

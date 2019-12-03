@@ -10,8 +10,8 @@ output:
 <big>
 
 ```{r, include=FALSE, message=F, warning=F}
-knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(echo = TRUE, fig.width=6, fig.height=4, fig.path='Figs/')
+library("knitr")
+opts_chunk$set(echo = TRUE)
 ```
 
 # Welcome to the Workshop on Statistics for Linguistics
@@ -20,10 +20,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 * Who I am and my background
 * Installing the necessary software
+* The RStudio environment
 * Loading data
 * Data exploration
-* Descriptive statistics
 * Plotting
+* Descriptive statistics
 
 ## Who I am and my background
 
@@ -37,8 +38,8 @@ What I can do is describe to you how to manage linguistic data in R, how to appl
 
 The first and most essential software package you require is R itself, which is "a free software environment for statistical computing and graphics". If you don't have R installed, go to <https://muug.ca/mirror/cran/> and download the appropriate version for your operating system:
 
-```{r echo = FALSE, out.width = "100%"}
-knitr::include_graphics("download_r.png")
+```{r echo = FALSE}
+include_graphics("images/download_r.png")
 ```
 
 If you already have R installed, it would be a good idea to open it and make sure it is updated. On a Mac, from the menu bar click:
@@ -53,8 +54,8 @@ After installing R, you will need to install RStudio:
 
 It's possible to do everything we will be doing in the workshop using just R on its own, but RStudio makes working with R a lot easier in a variety of ways. Get R here https://rstudio.com/products/rstudio/download/ and install it.
 
-```{r echo = FALSE, out.width = "100%"}
-knitr::include_graphics("download_rstudio.png")
+```{r echo = FALSE}
+include_graphics("images/download_rstudio.png")
 ```
 
 Again, if you already have RStudio you should check for updates. On a Mac, go to: 
@@ -67,179 +68,86 @@ I am planning to run the entire workshop inside RStudio rather than using Powerp
 
 The files I will be using in the workshop are located here: <https://github.com/onosson/UM_Workshop>
 
-```{r echo = FALSE, out.width = "100%"}
-knitr::include_graphics("github.png")
+```{r echo = FALSE}
+include_graphics("images/github.png")
 ```
 
 From that page, click `Clone or download` and then select `Download ZIP` (most people) or `Open in Desktop` if you are already on GitHub and use a version control app like GitHub Desktop (if you don't know/understand what that is, it's basically like Dropbox for coders).
 
+Assuming that you downloaded the .zip file, locate it in your computer and unzip it. This will create a folder called `UM_Workshop-master` which contains all of the files for the workshop. I *may* edit/update some of the daily files, but I'll let you know about that as we go along.
 
+Inside the folder is an RStudio project file: `UM_Workshop.Rproj`. Opening that file *should* open up RStudio.
 
-
-
-
-
-
-
-
-
-
-# The Languages in the Prairies Project (LIPP)
-
-We will be working with data from Dr. Nicole Rosen's LIPP corpus which documents language variation in the Prairie provinces. We will focus on data collected in interviews with Winnipeg residents who are either migrants from the Philippines, or who have Filipino ancestry. Of course, all of the techniques we will be using could apply to any type of linguistic (or other) data.
-
-# Loading the data
-
-First, we will install and load some R packages which we will need later.
-
-```{r, message=F, warning=F}
-if(!require(tidyverse)){install.packages("tidyverse")}
-if(!require(viridisLite)){install.packages("viridisLite")}
-
-library(tidyverse)
-library(viridisLite)
+```{r echo = FALSE}
+include_graphics("images/project_window.png")
 ```
 
-Next we load the LIPP data file, which is saved as a .csv (comma-separated values), a common simple-text format for spreadsheets. We will use the `read_csv` function to store this as an object simply named `LIPP`.
+If for some reason this does not work, open RStudio manually, and go to:
 
-``` {r}
-LIPP <- read_csv("LIPP.csv")
+>`File > New Project...`
+
+```{r echo = FALSE}
+include_graphics("images/new_project.png")
 ```
 
-The `read_csv` function loads a .csv as a `tidyverse` data table type called a `tibble`, and we get some feedback as a result of doing this which tells us the names and types of variables present in each column. Two types of variables in this file. A `double` is a real number which may or may not have a decimal, i.e. some value that we might have measured. A `character` is some text-based value, which usually represents some level of a categorical variable.
+Then click `Existing Directory` and select the location of the folder you downloaded from GitHub.
 
-# Exploring the data
+After going through all of this, you should have an RStudio project window open which has several "panes", which each have a variety of functions. At the bottom right there should be a pane which has several tabs, one of which should be `Files`. If you scroll through that and click on `Workshop1.Rmd`, that file should open in the upper left pane, and we will be all on the same page.
 
-We will run through a few ways of investigating a dataset such as the LIPP .csv which we loaded earlier as `LIPP`. we'll start by focusing on F2, the second vowel formant which is correlated with vowel front-to-back position, with higher F2 values indicating a more forward position.
+## The RStudio environment
 
-## Histograms
+RStudio is divided into 4 "panes". The default layout has the source code (where you work with files) in the upper left, and the console (where you work directly in R) in the lower left. The upper right pane contains several tabs, including the Environment where your loaded data items will be listed. The lower right contains access to the Files list, Plots, etc.
 
-To begin, let's look at the distribution of F2 across all speakers and all vowels. F2 is measured in Hz and, because it could potentially have any (positive) value, is a *continuous* variable. A histogram is a common way to examine continuous variables, so let's see 2 ways to make one. The first involves the 'quick-plot' function `qplot()`, which takes limited input and is intended for producing plots when you just want to see the results quickly but don't care so much about tweaking the details. All you need to do is enter the names of the `data table` and the `variable`, separated by a `$`.
+### Modifying RStudio
 
-``` {r}
-qplot(LIPP$F2)
+One of the nice things about RStudio is that you can adjust how it looks and operates. I use a non-standard theme which alters the colour scheme, and a non-standard font as well as modifying some of the panes arrangements. This is all done within the RStudio preferences/settings.
+
+```{r echo = FALSE}
+include_graphics("images/themes.png")
 ```
 
-We get a warning about selecting a better 'binwidth', which is the numerical width of the 'bins' which the F2 values are sorted into, and that make up the stacked columns of the histogram. We can safely ignore this for the time being.
-
-The second histogram ploting method uses `ggplot()` from the `ggplot2` package, part of `tidyverse`. The formula to produce this is a little more complex: we need to specify the data file, and then tell it that our x-axis variable is F2, and that we specifically want a histogram. The x-axis selection is made inside the `ggplot()` call using the `aes()` function. This stands for "aesthetic mappings" and has to do with how the data is mapped onto visual properties of plots. Not also that the specific type of plot, in this case with the `geom_histogram()` function, is on a separate line preceded by a `+` sign. This type of structure is particular to `ggplot2`, and from my understanding is probably going to change at some point in the future.
-
-``` {r}
-ggplot(data = LIPP, aes(x = F2)) +
-  geom_histogram()
+```{r echo = FALSE}
+include_graphics("images/panes.png")
 ```
 
-This produces a 100% identical plot as we got using `qplot()`. We also get the same warning here because we didn't specify any bin width, but we can now do so. Let's choose '50', i.e. every 50 Hz will be in a different bin. This is done inside the `geom_histogram()` function using the `binwidth` argument.
+I find that when I am coding for extended periods of time, it really helps to have a good visual environment.
 
-``` {r}
-ggplot(data = LIPP, aes(x = F2)) +
-  geom_histogram(binwidth = 50)
-```
+### R Markdown
 
-As an aside, you can find out all of the available options and structures for a given function by either entering it in the search box at the upper right of Rstudio, or by typing a `?` followed by the name of the function at the prompt in the Console. This will pull up the Description page for that function under the Help tab in the upper right.
+The main workshop files are written in R Markdown, which is a "markup" language that can generate a variety of document types including .html, .pdf, .doc etc. using simplified syntax. One of its nicest features is that you can include "chunks" of R code within the document text, which can be run inside of RStudio. This not only generates output, but lets you work with the code directly, which is why I am using this format for the workshop. In order to run R Markdown files properly, you may need to install some R packages.
+
+### R packages
+
+Packages are bundles of functions (and sometimes data) which are downloaded into R and allow you to do many different things that "Base R" doesn't provide easy access to. In order to install a package in R, there are two methods:
+
+**1.** Enter code in the `Console` tab in the lower left pane of RStudio. This is where you work directly with R, and is identical to running the R app on its own. to install the `markdown` package, enter the following code into the console and press return/enter
+
+ >`install.packages("rmarkdown")`
+
+ If you get an error message, that just means you already have the package installed.
+
+**2.** Go to the `packages` tab in the lower right pane. Click the `install` button and type the package name, in this case `rmarkdown`. In most cases, you will want to use the CRAN repository, and have `Install dependencies` checked. Click `Install` and the package will be installed into R.
+
+Installing packages makes them available, but by default when you start an R session user-installed packages are not loaded. To do this, use the `library()` function as in the following code snippet:
 
 ```{r}
-?ggplot
+library("rmarkdown")
 ```
 
-## Frequency plots
+Finally, once you have the `rmarkdown` package installed and loaded, and you have an .Rmd file open, you can "knit" it into a formatted document for viewing. To do this, click the `Knit` dropdown menu at the top of the .Rmd file, and (in this case) select `Knit to HTML`.
 
-An alternative to the histogram is the *frequency polygon*, which works much the same way but instead produces a contour outline of the data distribution. I'm also going to apply one of the available `ggplot()` themes just because I can! This is done in the same way that other functions are added into a `ggplot` call, by separating each function by a `+`.
-
-``` {r}
-ggplot(data = LIPP, aes(x = F2)) +
-  geom_freqpoly(binwidth = 50) +
-  theme_light()
+```{r echo = FALSE}
+include_graphics("images/knit.png")
 ```
 
-It's generally thought that men's and women's voices differ in frequency, which affects not only fundamental frequency (i.e. pitch) but also the upper harmonics, which vowel formants consist of. Does our data reflect this? One way to tell is to 'facet' the separate distributions for each sex.
+This may take a little time and you will see R running in the Console tab in the lower left pane, but eventually an html document will open up in the Viewer tab in the lower right pane (it may expand to fill the whole right side).
 
->**Note:** Like a lot of linguistic corpora, LIPP divides speakers according to sex/gender into male and female, under the implicit assumption that sex and gender are a singular, binary social category. While there has been some work done in fields such as sociolinguistics to question this assumption, in all honesty it hasn't progressed very far, and even researchers (such as myself) who are prepared to accept that this assumption is wrong, or at least should be interrogated, are often unsure about specifically how this could better be dealt with. Until we have a better answer, and given that there isn't a consensus around this, I will present the LIPP data 'as-is'.
+### Using packages and cheat sheets
 
-To facet our data by some variable, we add the `facet_wrap()` function under the `ggplot` call. Inside this, we put a tilde followed by the variable we wish to facet by.
+There is an almost unlimited amount of information out there relating to R coding, way too much to try and retain in memory (at least for me), and new packages are being developed and released all the time. 
 
->If you are wondering if you can facet by more than one variable, the answer is yes!
+The Help tab in the upper right pane lets you search through your installed packages and functions, and view their documentation. These typically include descriptions, implementation in R code, and examples of usage.
 
-``` {r}
-ggplot(data = LIPP, aes(x = F2)) +
-  geom_freqpoly(binwidth = 50) +
-  facet_wrap(~ sex) +
-  theme_light()
-```
-
-It looks like these distributions are different, but we could have a better visual sense of this if we overlaid them on top of each other. We can do this by simply telling `ggplot` to differentiate the colour 'aesthetic mapping' according to the `sex` variable, rather than faceting the data. Sometimes you need to play around with some of the different options in order to determine the best visualization method for what you are trying to display.
-
->**Note:** I have a form of colour blindness which makes it very difficult for me to clearly distinguish a lot of the colours commonly present in plots. All of my examples here will use the ``scale_colour_viridis_d()`` function from the ``viridisLite`` R package, which is designed to *"provide colour maps that are perceptually uniform in both colour and black-and-white. They are also designed to be perceived by viewers with common forms of colour blindness"*. It can still be hard to distinguish large numbers of categories even with this method (see the vowels example below), but it's still better than a lot of the alternatives.
-
-``` {r F2sex}
-ggplot(data = LIPP, aes(x = F2, colour=sex)) +
-  geom_freqpoly(binwidth = 50) +
-  scale_colour_viridis_d() +
-  theme_light()
-```
-
-We can see pretty clearly here that the male and female speakers do have different distributions for F2, although the male distribution falls almost entirely inside the female distribution.
-
-Just out of curiosity, what if we applied the colour aesthetic mapping to the `vowel` variable instead?
-
-``` {r}
-ggplot(data = LIPP, aes(x = F2, colour=vowel)) +
-  geom_freqpoly(binwidth = 50) +
-  scale_colour_viridis_d() +
-  theme_light()
-```
-
-We can see that each vowel has, as we might well expect, a unique distribution of F2 values. We'll come back to look at vowel differences later on.
-
-## *t*-tests
-
-Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to formally test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, across two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
-
-``` {r}
-t.test(x = LIPP$F2[LIPP$sex == "male"], 
-       y = LIPP$F2[LIPP$sex == "female"])
-```
-
-Because the *t* value is quite large and the *p* value is extremely small, we can comfortably reject the null hypothesis, and conclude that the LIPP male vs. female F2 distributions are substantially (*t* value) and significantly (*p* value) different from each other.
-
-## Boxplots and descriptive statistics
-
-Let's look at these two distributions in a boxplot. These are a type of plot used to highlight certain key aspects of a distribution. Boxplots expect to be provided one continuous variable (often plotted on the *y*-axis) and one categorical variable (on the *x*-axis) -- sometimes, there may be just one set of data, in which case there is no categorical variable to divide the data by.
-
-``` {r}
-ggplot(data = LIPP, aes(y = F2, x = sex)) +
-  geom_boxplot() +
-  scale_colour_viridis_d() +
-  theme_light()
-```
-
-What is indicated in the boxplot? The rectangular box itself contains the central 50% quantity of the distribution, and the central line indicates the median (not the mean!) value, i.e. the value exactly in the centre of the data. The two extended lines or "whiskers" mark the range of the distribution beyond which observations are considered to be "outliers", which are marked with dots. The whiskers are each 1.5 times the distance of the box itself, i.e. 1.5 times the central 50% of the range (this is the interquartile range or IQR). Note that there appear to be a lot more high-frequency outliers than low-frequency ones, for both males and females.
-
-Overall, the two distributions look pretty similar to each other, but the female speakers' frequencies are shifted higher by 200-300 Hz. This both fits with our intuition and knowledge about sex-based speech differences, and our previous examination of the data.
-
-By the way, if you just want to capture some of the basic numerical descriptors regarding your data, the ``summary()`` function is pretty useful. This provides statistical values including the minimum, maximum, median and mean values, as well as the 1st and 3rd quantiles, which define the outer boundaries of the box in a boxplot. If you just want the quantiles, ``quantile()`` gives you all of that except the mean -- recall that the mean is actually not part of a boxplot, so this is a more accurate representation of the numerical data related to that type of plot.
-
-```{r}
-summary(LIPP$F2)
-quantile(LIPP$F2)
-```
-
-We can also look at our two sex/gender groups individually.
-
-```{r}
-summary(LIPP$F2[LIPP$sex == "male"])
-```
-
-```{r}
-summary(LIPP$F2[LIPP$sex == "female"])
-```
-
-We can readily see that all of the values skew higher for the female speakers. This is the same result we saw in the boxplots earlier, put into numerical form. Personally, I rarely start with summarizing my data numerically like this, as I find a visual analysis far easier to grasp quickly. But numerical values are certainly useful and necessary in reporting your data later.
-
-## Exercises
-
-1. What other variables in the data could we perform *t*-tests on? Try running some of them using the previous code as an example.
-
-1. What kinds of things can you *not* do with the *t*-test? Try to think of some questions that you wouldn't be able to answer using the things we've looked at so far.
+Another excellent resource are the various "cheat sheets" which are available for a variety of packages, or for R and RStudio themselves. <https://rstudio.com/resources/cheatsheets/> hosts many useful cheat sheets, and I have included several in Workshop folder `UM_Workshop/cheatsheets` for easy access, including "Base R", "RStudio IDE", "Data Transformation with dplyr", "Data visualization with ggplot2" and "R Markdown".
 
 </big>
