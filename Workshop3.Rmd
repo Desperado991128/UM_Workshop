@@ -21,7 +21,6 @@ opts_chunk$set(echo = TRUE)
 * Loading data
 * Data exploration
 * Plotting
-* Descriptive statistics
 
 ---
 
@@ -67,7 +66,15 @@ After storing the data in the `LIPP` object, we get some feedback in the form of
 
 # Exploring the data
 
-We will run through a few ways of investigating a dataset such as the LIPP .csv which we loaded earlier as `LIPP`. we'll start by focusing on F2, the second vowel formant which is correlated with vowel front-to-back position, with higher F2 values indicating a more forward position.
+We will run through a few ways of investigating a dataset such as the LIPP .csv which we loaded earlier as `LIPP`. We can get a view of the data by simply entering the name of the object into R:
+
+```{r}
+LIPP
+```
+
+Each row represents one observation (measurement or set of measurements) and each column represents some variable. In this case, each observation is a single vowel. We can see only a few of the variables (columns) but there are many more which we can scroll through using the arrow buttons in the top row.
+
+Columns 9-11 list the mean formant measurements for each vowel. We'll start by focusing on F2, the second vowel formant which is correlated with vowel front-to-back position, with higher F2 values indicating a more forward position.
 
 There are a *lot* of ways to explore the data, and there's really no right or wrong place to begin. It really depends what kind of question you are trying to answer. Let's say you were interested in seeing, on average, how far forward the average vowel articulation was in the data, which would be correlated with F2. We could get the mean of all the F2 values:
 
@@ -109,7 +116,7 @@ Just a blank plot. We need to add the variable we want to map using the `aes()` 
 ggplot(data = LIPP, aes(x = F2))
 ```
 
-This plot is not completely blank - we have some numbers on the x-axis and grid markers, but there is no data. The final step is to add one of the many `geom_` functions available in `ggplot()`. `qplot()` automatically tries to select an appropriate `geom_`, but `ggplot()` does not. In this case we want a histogram, which is generated with `geom_histogram()`. The way that `geom_`s and other plot elements are added in `ggplot()` is by placing them in sequence separated by a `+`. 
+This plot is not completely blank - we have some numbers on the x-axis and grid markers, but there is no data. The final step is to add one of the many `geom_` functions available in `ggplot()`. `qplot()` automatically tries to select an appropriate geom, but `ggplot()` does not. In this case we want a histogram, which is generated with `geom_histogram()`. The way that geoms and other plot elements are added in a `ggplot()` is by placing them in sequence separated by a `+`. 
 
 >From my understanding, this type of structure, with `ggplot()` elements separated by `+`, is probably going to change at some point in the future, but don't quote me on that.
 
@@ -131,19 +138,19 @@ As an aside, you can find out all of the available options and structures for a 
 ?ggplot
 ```
 
-There are a **lot** of `geom_`s available in `ggplot()`:
+There are a **lot** of geoms to choose from:
 
 ```{r}
 include_graphics("images/ggplot.png")
 ```
 
-Since we are plotting one variable which is continuous, let's focus on the available `geom_`s for that option:
+Since we are plotting one variable which is continuous, let's focus on the available geoms for that option:
 
 ```{r}
 include_graphics("images/ggplot_one_variable.png")
 ```
 
-The *frequency polygon*, which works much like a histogram but produces a contour outline of the data distribution rather than stacked bins, although it still *uses* the binwidth argument. Setting a reasonably fine-grained binwidth produces a smooth contour outline.
+`geom_freqpoly` works much like a histogram but produces a contour outline of the data distribution - a *frequency polygon* - rather than stacked bins, although it still uses the binwidth argument as it is built around the same underlying data structure. Setting a reasonably fine-grained binwidth produces a smooth contour outline.
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
@@ -152,114 +159,218 @@ ggplot(data = LIPP, aes(x = F2)) +
 
 >Try changing the binwidth settings in the histogram and frequency polygon plots to produce different visual mappings. You can *drastically* change the plot output by doing so.
 
-Another similar `geom_` is the `geom_area()` plot. This function maps data using a variety of `stat`s for different purposes - we will specify "bin" in this case so the data is "binned" in the same way that it is for a histogram.
+Another similar geom is the `geom_area()` plot. This function maps data using a variety of "stat"s for different purposes - we will specify the stat as "bin" in this case so the data is "binned" in the same way that it is for a histogram or frequency polygon
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_area(stat = "bin", binwidth = 50)
 ```
 
+It is possible to alter the shading of the area plot by adjusting the "alpha" value which ranges between 0 (fully transparent) and 1 (completely shaded).
 
+``` {r}
+ggplot(data = LIPP, aes(x = F2)) +
+  geom_area(stat = "bin", binwidth = 50, alpha = 0.5)
+```
 
+Adjusting alpha in this way can be really useful when multiple data distributions are overlaid in a single plot - something we will return to.
 
+One of the nicest features of ggplot is the ability to "facet" data. This takes a ggplot structure and divides it according a set of criteria, producing multiple sub-plots covering the various levels of whichever variable we specify. Let's see some of the variables present in the LIPP dataset:
 
+```{r}
+LIPP
+```
 
+>Only some of the rows (observations) and columns (variables) are shown, but it is possible to scroll through all of the columns using the arrow buttons in the top row.
 
+To get a summary of the categories or levels present for a given variable, you can use the `table()` function:
 
+```{r}
+table(LIPP$sex)
+```
 
+>**Note 1:** `table()` is most effective for a categorical variable such as "language", "sex" etc. where there are a set number of discrete levels. For continuous variables, such as F1, F2, using `table()` produces very different output - try it out.
 
+>**Note 2:** Like a lot of linguistic corpora, LIPP divides speakers according to sex/gender into *male* and *female* categories. There is and has historically been an implicit and widespread societal assumption that sex and gender are a singular, binary social category. While there has been some work done in fields such as sociolinguistics to question this assumption, in all honesty it hasn't progressed very far, and even researchers (such as myself) who are prepared to accept that this assumption is wrong are often unsure about specifically how to better deal with these categories. For the time being, and especially given that there isn't a consensus around this, I will present the LIPP data 'as-is'.
 
+One of the questions we could ask is whether there are production differences between the voices of speakers classified as *female* or *male* in the LIPP data. One way to achieve this is to 'facet' the F2 distributions by sex.
 
-
-
-It's generally thought that men's and women's voices differ in frequency, which affects not only fundamental frequency (i.e. pitch) but also the upper harmonics, which vowel formants consist of. Does our data reflect this? One way to tell is to 'facet' the separate distributions for each sex.
-
->**Note:** Like a lot of linguistic corpora, LIPP divides speakers according to sex/gender into male and female, under the implicit assumption that sex and gender are a singular, binary social category. While there has been some work done in fields such as sociolinguistics to question this assumption, in all honesty it hasn't progressed very far, and even researchers (such as myself) who are prepared to accept that this assumption is wrong, or at least should be interrogated, are often unsure about specifically how this could better be dealt with. Until we have a better answer, and given that there isn't a consensus around this, I will present the LIPP data 'as-is'.
-
-To facet our data by some variable, we add the `facet_wrap()` function under the `ggplot` call. Inside this, we put a tilde followed by the variable we wish to facet by.
-
->If you are wondering if you can facet by more than one variable, the answer is yes!
+To facet data by some variable, add the `facet_wrap()` function to the `ggplot` call. Inside `facet_wrap()`, put a period (this works as a placeholder, for reasons to be discussed below) and a tilde followed by the variable we wish to facet by.
 
 ``` {r}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_freqpoly(binwidth = 50) +
-  facet_wrap(~ sex) +
-  theme_light()
+  facet_wrap(. ~ sex)
 ```
 
-It looks like these distributions are different, but we could have a better visual sense of this if we overlaid them on top of each other. We can do this by simply telling `ggplot` to differentiate the colour 'aesthetic mapping' according to the `sex` variable, rather than faceting the data. Sometimes you need to play around with some of the different options in order to determine the best visualization method for what you are trying to display.
+If you are wondering if you can facet by more than one variable, the answer is yes! Replace the period by some other variable, e.g. "language". This will produce sub-plots faceted by all the various combinations of sex and language:
 
->**Note:** I have a form of colour blindness which makes it very difficult for me to clearly distinguish a lot of the colours commonly present in plots. All of my examples here will use the ``scale_colour_viridis_d()`` function from the ``viridisLite`` R package, which is designed to *"provide colour maps that are perceptually uniform in both colour and black-and-white. They are also designed to be perceived by viewers with common forms of colour blindness"*. It can still be hard to distinguish large numbers of categories even with this method (see the vowels example below), but it's still better than a lot of the alternatives.
-
-``` {r F2sex}
-ggplot(data = LIPP, aes(x = F2, colour=sex)) +
+``` {r}
+ggplot(data = LIPP, aes(x = F2)) +
   geom_freqpoly(binwidth = 50) +
-  scale_colour_viridis_d() +
-  theme_light()
+  facet_wrap(language ~ sex)
 ```
 
-We can see pretty clearly here that the male and female speakers do have different distributions for F2, although the male distribution falls almost entirely inside the female distribution.
+>Note that the sub-plots are arranged according to the faceting order: levels of "language" (English, Ilocano ...) occur in order, and each of these is then sub-faceted by "sex". Try reversing the order in the `facet_wrap()` function to see the alternative.
 
-Just out of curiosity, what if we applied the colour aesthetic mapping to the `vowel` variable instead?
+Since each sub-facet has drastically different numbers of tokens, it's hard to see how these distributions compare. An alternative geom which is more useful in this case is `geom_density`. This reports distributions in a way which relativizes differences in token counts, allowing greater ease of comparison across categories. I'll just use the original plot faceted for speaker sex here:
 
 ``` {r}
-ggplot(data = LIPP, aes(x = F2, colour=vowel)) +
-  geom_freqpoly(binwidth = 50) +
-  scale_colour_viridis_d() +
-  theme_light()
+ggplot(data = LIPP, aes(x = F2)) +
+  geom_density() +
+  facet_wrap(language ~ sex)
 ```
 
-We can see that each vowel has, as we might well expect, a unique distribution of F2 values. We'll come back to look at vowel differences later on.
-
-## *t*-tests
-
-Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to formally test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, across two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
+Let's use this geom with faceting applied only to speaker sex:
 
 ``` {r}
-t.test(x = LIPP$F2[LIPP$sex == "male"], 
-       y = LIPP$F2[LIPP$sex == "female"])
+ggplot(data = LIPP, aes(x = F2)) +
+  geom_density() +
+  facet_wrap(. ~ sex)
 ```
 
-Because the *t* value is quite large and the *p* value is extremely small, we can comfortably reject the null hypothesis, and conclude that the LIPP male vs. female F2 distributions are substantially (*t* value) and significantly (*p* value) different from each other.
+It looks like these distributions are different, but we could have a better visual sense of this if we overlaid them on top of each other. Sometimes you need to play around with some of the different options in order to determine the best visualization method for what you are trying to display.
 
-## Boxplots and descriptive statistics
+> There are a number of "aesthetic mappings" available in ggplot's `aes()` function. Two of these are the "x" and "y" coordinates - these (and only these) can be omitted as they are so commonly used, but all others must be specified by name. It is a bit hard to find a comprehensive list of all aesthetic mappings in ggplot - even the help documentation on `ggplot()` and `aes()` do not provide this, but you *can* find it here: <https://ggplot2.tidyverse.org/articles/ggplot2-specs.html>
 
-Let's look at these two distributions in a boxplot. These are a type of plot used to highlight certain key aspects of a distribution. Boxplots expect to be provided one continuous variable (often plotted on the *y*-axis) and one categorical variable (on the *x*-axis) -- sometimes, there may be just one set of data, in which case there is no categorical variable to divide the data by.
+One alternative to faceting is use the `colour` aesthetic to map speaker sex. This goes inside `ggplot(aes())` just like "x = F2":
 
 ``` {r}
-ggplot(data = LIPP, aes(y = F2, x = sex)) +
-  geom_boxplot() +
-  scale_colour_viridis_d() +
-  theme_light()
+ggplot(data = LIPP, aes(x = F2, colour = sex)) +
+  geom_density()
 ```
 
-What is indicated in the boxplot? The rectangular box itself contains the central 50% quantity of the distribution, and the central line indicates the median (not the mean!) value, i.e. the value exactly in the centre of the data. The two extended lines or "whiskers" mark the range of the distribution beyond which observations are considered to be "outliers", which are marked with dots. The whiskers are each 1.5 times the distance of the box itself, i.e. 1.5 times the central 50% of the range (this is the interquartile range or IQR). Note that there appear to be a lot more high-frequency outliers than low-frequency ones, for both males and females.
+Another option is to use the `fill` instead of the `colour` aesthetic:
 
-Overall, the two distributions look pretty similar to each other, but the female speakers' frequencies are shifted higher by 200-300 Hz. This both fits with our intuition and knowledge about sex-based speech differences, and our previous examination of the data.
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = sex)) +
+  geom_density()
+```
 
-By the way, if you just want to capture some of the basic numerical descriptors regarding your data, the ``summary()`` function is pretty useful. This provides statistical values including the minimum, maximum, median and mean values, as well as the 1st and 3rd quantiles, which define the outer boundaries of the box in a boxplot. If you just want the quantiles, ``quantile()`` gives you all of that except the mean -- recall that the mean is actually not part of a boxplot, so this is a more accurate representation of the numerical data related to that type of plot.
+When we do this, we can also adjust the alpha to make the fills semi-transparent, in order to more easily see the differences between the distributions:
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
+  geom_density()
+```
+
+While we are playing around with plotting options, notice that adjusting the alpha caused it to appear in the legend, which probably is not wanted. We can override this by adding a specification in the `guides()` function to the ggplot call:
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
+  geom_density() +
+  guides(alpha = FALSE)
+```
+
+One of the other common plot functions is `labs()` which provides a number of different labelling options. You can add a plot title and subtitle, and change the labels of any of the aesthetic mappings, including ones (such as "y" in this case) which are not originally specified in the ggplot call.
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
+  geom_density() +
+  guides(alpha = FALSE) +
+  labs(title = "Distribution of F2",
+       subtitle = "Differentiated by speaker sex",
+       x = "F2 (Hz)",
+       y = "Token density",
+       fill = "Speaker sex")
+```
+
+While we are looking at adjusting plot visuals, I am going to demonstrate two more things. The first is the colour scheme or palette. We didn't specify one so far, so ggplot used its default set of colours. At the beginning of this page I loaded the `viridis` package which provides a different colour palette. We can now add this to ggplot. 
+
+`viridis` provides several different functions depending what we are applying the colour scheme to. Depending on whether we have the `colour` or `fill` aesthetic, use `scale_colour_viridis()` or `scale_fill_viridis()` respectively. We then need to specify if we are using a discrete or categorical variable, which is done by adding `discrete = TRUE/FALSE` inside the function. In this case, we have a categorical variable, so we want `discrete = TRUE`:
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
+  geom_density() +
+  guides(alpha = FALSE) +
+  labs(title = "Distribution of F2",
+       subtitle = "Differentiated by speaker sex",
+       x = "F2 (Hz)",
+       y = "Token density",
+       fill = "Speaker sex") +
+  scale_fill_viridis(discrete = TRUE)
+```
+
+>**Note:** The default for `scale_colour_viridis()` and `scale_fill_viridis()` is `discrete = FALSE` so it only needs to be specified for categorical variables. There are also alternative functions which specify discrete/continuous data in the function name instead: e.g. `scale_fill_viridis_c()` vs. `scale_fill_viridis_d()`
+
+Finally... we will look at some of the ggplot themes. These alter the general look of the plot. All of the themes and visual examples are available at: <https://ggplot2.tidyverse.org/reference/ggtheme.html>. From that page, the various themes and descriptions are:
+
+* `theme_gray` The signature ggplot2 theme with a grey background and white gridlines, designed to put the data forward yet make comparisons easy.
+
+* `theme_bw` The classic dark-on-light ggplot2 theme. May work better for presentations displayed with a projector.
+
+* `theme_linedraw` A theme with only black lines of various widths on white backgrounds, reminiscent of a line drawings. Serves a purpose similar to theme_bw. Note that this theme has some very thin lines (<< 1 pt) which some journals may refuse.
+
+* `theme_light` A theme similar to theme_linedraw but with light grey lines and axes, to direct more attention towards the data.
+
+* `theme_dark` The dark cousin of theme_light, with similar line sizes but a dark background. Useful to make thin coloured lines pop out.
+
+* `theme_minimal` A minimalistic theme with no background annotations.
+
+* `theme_classic` A classic-looking theme, with x and y axis lines and no gridlines.
+
+* `theme_void` A completely empty theme.
+
+* `theme_test` A theme for visual unit tests. It should ideally never change except for new features.
+
+I like `theme_minimal` in a lot of cases, so let's try adding it:
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
+  geom_density() +
+  guides(alpha = FALSE) +
+  labs(title = "Distribution of F2",
+       subtitle = "Differentiated by speaker sex",
+       x = "F2 (Hz)",
+       y = "Token density",
+       fill = "Speaker sex") +
+  scale_fill_viridis(discrete = TRUE) +
+  theme_minimal()
+```
+
+>Try changing the theme to some of the other available options.
+
+How does this work with a categorical variable having more than two levels? Let's see the variable `vowel` in the LIPP data:
 
 ```{r}
-summary(LIPP$F2)
-quantile(LIPP$F2)
+table(LIPP$vowel)
 ```
 
-We can also look at our two sex/gender groups individually.
+>**Note:** This data was generated by FAVE, which uses the Arpabet phonetic transcription system instead of IPA, which you may be unfamiliar with. I won't get into a full explanation of these yet.
+
+Let's try mapping fill to `vowel` instead of `sex`:
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2, fill = vowel, alpha = 0.7)) +
+  geom_density() +
+  guides(alpha = FALSE) +
+  labs(title = "Distribution of F2",
+       subtitle = "Differentiated by vowel",
+       x = "F2 (Hz)",
+       y = "Token density",
+       fill = "Vowel (arpabet)") +
+  scale_fill_viridis(discrete = TRUE) +
+  theme_minimal()
+```
+
+In this case, overlapping density distributions is fairly hard to work with given the number of categories. Let's try faceting instead. There are a few necessary changes that need to be made to this plot call to accomplish this - hopefully you can predict what needs to be changed.
+
+``` {r}
+ggplot(data = LIPP, aes(x = F2)) +
+  geom_density() +
+  guides(alpha = FALSE) +
+  labs(title = "Distribution of F2",
+       subtitle = "Faceted by vowel",
+       x = "F2 (Hz)",
+       y = "Token density") +
+  facet_wrap(. ~ vowel) +
+  theme_minimal()
+```
+
+A final useful tool at this stage is to be able to save plots, allowing you to use them in presentations, papers, or other documents. The very handy function `ggsave()` does this. The simplest usage needs you to only specify the filename, and will default to saving the last generated plot into the currently-used folder with some default size. Filetype is specified right in the filename, and can include .jpg, .png, .bmp etc. I usually use .pdf as these render nicely at all kinds of scales. You can alter plot size and a variety of other elements inside `ggsave()`, but I won't go into those options here.
 
 ```{r}
-summary(LIPP$F2[LIPP$sex == "male"])
+ggsave("LIPP_vowels_F2.pdf")
 ```
-
-```{r}
-summary(LIPP$F2[LIPP$sex == "female"])
-```
-
-We can readily see that all of the values skew higher for the female speakers. This is the same result we saw in the boxplots earlier, put into numerical form. Personally, I rarely start with summarizing my data numerically like this, as I find a visual analysis far easier to grasp quickly. But numerical values are certainly useful and necessary in reporting your data later.
-
-## Exercises
-
-1. What other variables in the data could we perform *t*-tests on? Try running some of them using the previous code as an example.
-
-1. What kinds of things can you *not* do with the *t*-test? Try to think of some questions that you wouldn't be able to answer using the things we've looked at so far.
 
 </big>
