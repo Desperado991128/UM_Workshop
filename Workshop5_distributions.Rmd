@@ -34,6 +34,28 @@ library(viridis)
 LIPP <- read_csv("LIPP.csv")
 ```
 
+
+OLD STUFF BEGINS HERE:
+
+## *t*-tests
+
+Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to formally test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, across two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
+
+``` {r}
+t.test(x = LIPP$F2[LIPP$sex == "male"], 
+       y = LIPP$F2[LIPP$sex == "female"])
+```
+
+Because the *t* value is quite large and the *p* value is extremely small, we can comfortably reject the null hypothesis, and conclude that the LIPP male vs. female F2 distributions are substantially (*t* value) and significantly (*p* value) different from each other.
+
+## Exercises
+
+1. What other variables in the data could we perform *t*-tests on? Try running some of them using the previous code as an example.
+
+1. What kinds of things can you *not* do with the *t*-test? Try to think of some questions that you wouldn't be able to answer using the things we've looked at so far.
+
+END OF OLD STUFF
+
 # Exploring distributions
 
 ## Normal distributions
