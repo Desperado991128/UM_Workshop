@@ -192,18 +192,17 @@ LIPP %>%
   geom_point()
 ```
 
-This looks... not great? And it doesn't even have the regression line! We can add that with the `geom_smooth()` function which is used to add a variety of analysis-based lines. We need to tell it we are using the "glm" method of analysis, and specifically the binomial "family" in glm.
+This looks... not great? And it doesn't even have the regression line! We can add that with the `geom_smooth()` function which is used to add a variety of analysis-based lines -- in this case we use the "lm" `method` of analysis.
 
 ```{r}
 LIPP %>% 
   ggplot(aes(x = F2, 
              y = as.numeric(as.factor(sex))-1)) + 
   geom_point() +
-  geom_smooth(method = "glm", 
-    method.args = list(family = "binomial"))
+  geom_smooth(method = "lm")
 ```
 
-Finally, we get a line! the direction of the line, descending on the y-axis from 1 to 0 as F2 ascends, tells us that lower F2 values are associated with the points at "1" on the y-axis, and higher F2 values are associated with the points at "0". Since these are just substitutes for the `sex` categories of "male" and "female" respectively, it would be helpful to now replace these converted numbers with the original labels!
+Finally, we get a line! the direction of the line, descending on the y-axis as F2 ascends, tells us that lower F2 values are more associated with the points at "1" on the y-axis, and higher F2 values are more associated with the points at "0". Since the y-axis numbers are just substitutes for the `sex` categories of "male" and "female" respectively, it would be helpful to now replace these converted numbers with the original labels!
 
 This can be done with the ggplot function `scale_y_continuous()` using two arguments inside it -- `breaks` which tells it where to make tick marks on the axis, and `labels` which puts text on those texts. Since we are providing it with multiple (two) entries for both `breaks` and `labels`, they need to be inside the base-R function `c()` for "combine". We'll also add a y-axis title of "Speaker sex" using the `ylab()` function:
 
@@ -212,8 +211,7 @@ LIPP %>%
   ggplot(aes(x = F2, 
              y = as.numeric(as.factor(sex))-1)) + 
   geom_point() +
-  geom_smooth(method = "glm", 
-    method.args = list(family = "binomial")) +
+  geom_smooth(method = "lm") +
   scale_y_continuous(breaks = c(0, 1),
                      labels = c("female", "male")) +
   ylab("Speaker sex")
@@ -226,8 +224,7 @@ LIPP %>%
   ggplot(aes(x = F2, 
              y = as.numeric(as.factor(sex))-1,)) + 
   geom_jitter(size = 0.01, width = 0) +
-  geom_smooth(method = "glm", 
-    method.args = list(family = "binomial")) +
+  geom_smooth(method = "lm") +
   scale_y_continuous(breaks = c(0, 1),
                      labels = c("female", "male")) +
   ylab("Speaker sex")
@@ -278,7 +275,7 @@ LIPP %>%
 
 This model tells us that year of birth does indeed predict F2 values for /u/, which increase over time by +4.857 Hz per year -- there is, however, a lot of variability (see the very small R-squared value). 
 
-We can plot the distribution and the linear model together using a similar ggplot call as we used earlier for F2 by sex. In this case we have a bit less work to do because both variables, F2 and year, are numeric. We'll use `geom_jitter()` again with its default settings, and `geom_smooth()` with the "lm" method since this is a simple linear model.
+We can plot the distribution and the linear model together using a similar ggplot call as we used earlier for F2 by sex. In this case we have a bit less work to do because both variables, F2 and year, are both already numeric. We'll use `geom_jitter()` again with its default settings to plot the points.
 
 ```{r}
 LIPP %>% 
@@ -421,5 +418,23 @@ LIPP %>%
   geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
   geom_smooth(method = "lm", col = "red")
 ```
+
+# A problem: Independence
+
+All of the data we have looked at so far in LIPP are drawn from sociolinguistic interviews with (in most cases) one interviewee. Each speaker thus contributes a huge amount of data. We can see this by making a table on the `speaker_id` column:
+
+```{r}
+table(LIPP$speaker_id)
+
+min(table(LIPP$speaker_id))
+max(table(LIPP$speaker_id))
+```
+
+Each three-digit number from 201 to 230 is just a code identifying one speaker, while the number underneath indicates the number of vowel tokens measured for that speaker during their interview. The smallest per-speaker n is 2,244, while the largest is 10,347. This is actually a problem for linear models, as they rely on what is called the assumption of independence. Bodo Winter has some excellent commentary on this in his tutorial on linear models <http://www.bodowinter.com/uploads/1/2/9/3/129362560/bw_lme_tutorial1.pdf>:
+
+>What exactly is independence? The ideal case is a coin flip or the roll of a die: Each coin flip and each roll of a die is absolutely independent from the outcome of the preceding coin flips or die rolls. The same should hold for your data points when you run a linear model analysis. So, the data points should come from different subjects. And each subject should only contribute one data point.
+>When you violate the independence assumption, all hell breaks loose. The other assumptions that we mentioned above are important as well, but the independence assumption is by far the most important one. Violating independence may greatly inflate your chance of finding a spurious result and it results in a p-value that is completely meaningless. Unfortunately, violations of the independence assumption are quite frequent in many branches of science – so much in fact, that there’s a whole literature associated with this violation, starting from Hurlbert (1984) for ecology, Freeberg and Lucas (2009) for psychology, Lazic (2010) for neuroscience and my own small paper for phonetics/speech science (Winter, 2011).
+How can you guarantee independence? Well, independence is a question of the experimental design in relation to the statistical test that you use. Design and statistical analyses are closely intertwined and you can make sure that you meet the independence assumption by only collecting one data point per subject.
+Now, a lot of the times, we want to collect more data per subject, such as in repeated measures designs. If you end up with a data set that has non-independencies in it, you need to resolve these non-independencies at the analysis stage. This is where mixed models come in handy... 
 
 </big>
