@@ -18,7 +18,7 @@ opts_chunk$set(echo = TRUE)
 
 ## Agenda {-}
 
-* Exploring distributions
+* Normal distributions
 
 ---
 
@@ -34,112 +34,264 @@ library(viridis)
 LIPP <- read_csv("LIPP.csv")
 ```
 
+# Normal distributions
 
-OLD STUFF BEGINS HERE:
-
-## *t*-tests
-
-Having observed earlier that the male & female speakers appear to have different F2 distributions, we might want to formally test this. A *t*-test is probably the simplest method for doing so, and is appropriate here because we are looking at one continuous variable, F2 values, across two groups. We provide it with the two sets of data for F2, split by speaker sex, and it determines whether there is reason to reject the null hypothesis, which would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant.
-
-``` {r}
-t.test(x = LIPP$F2[LIPP$sex == "male"], 
-       y = LIPP$F2[LIPP$sex == "female"])
-```
-
-Because the *t* value is quite large and the *p* value is extremely small, we can comfortably reject the null hypothesis, and conclude that the LIPP male vs. female F2 distributions are substantially (*t* value) and significantly (*p* value) different from each other.
-
-## Exercises
-
-1. What other variables in the data could we perform *t*-tests on? Try running some of them using the previous code as an example.
-
-1. What kinds of things can you *not* do with the *t*-test? Try to think of some questions that you wouldn't be able to answer using the things we've looked at so far.
-
-END OF OLD STUFF
-
-# Exploring distributions
-
-## Normal distributions
-
-Let's look at the F2 quickplot from the previous workshop page again.
+Let's look at a quickplot of F2 in the LIPP data.
 
 ```{r}
-qplot(LIPP$F2) +
-  theme_light()
+qplot(LIPP$F2)
 ```
 
-The shape we see here resembles a common pattern called the *normal distribution*, or sometimes a *bell curve*. The definition of a normal distribution is mathematically defined, and we won't go into it here. In most usages, it refers to a set of data which is uniformly distributed across a range such that the median and mean are identical. An important aspect of normal distributions is the *Central Limit Theorem* (CLT) which notes that as more data is added, most distributions become more normal.
+The shape we see here resembles a common pattern called the *normal distribution*, or sometimes a *bell curve*. The definition of a normal distribution is mathematically defined, and we won't go into it here. In most usages, it refers to a set of data which is uniformly distributed across a range such that the median and mean are identical. An important aspect of normal distributions is the *Central Limit Theorem* (CLT) which states that as more data is added, most distributions become more normal.
 
-We can generate a random normal distribution to see how this works; I'm using a formula which centers the distribution at 0, with a Standard Deviation of 100. We'll start with a distribution having only 10 observations, and increase this by powers of 10 until we get to 100,000 observations.
+We can use R to generate a *random* normal distribution to see how this works. To do this I will use a custom function - so let's learn how to do that.
 
-> **Note:** The code below includes a random 'seed' setting which ensures that the selection made is identical even when run at different times on different machines. If you change the seed to a different value, you will get different results, but the progression across the different observation magnitudes should be similar -- although it is possible to have a reversal where adding *more* observations causes the mean and median to drift (slightly) *further away* from each other.
+## Custom functions (brief tangent) {-}
+
+Every R package contains a set of custom functions, and it's possible to build your own functions in exactly the same way using the built in R function called, appropriately, `function()`. A function consists of a list of `arguments`, which are input into the function, and an `expression` which produces some output.
+
+Let's say we wanted to create a function to determine the difference between the mean and the median in a set of data. We could do this manually by getting each value and then subtracting one from the other:
 
 ```{r}
-MyHistogram <- function(x) qplot(x, xlab = paste("n =", length(x), "; mean =", round(mean(x),3), "; median =", round(median(x),3), "; difference =", abs(round(mean(x),3)-round(median(x),3)))) + theme_light()
+mean(LIPP$F2)
+median(LIPP$F2)
+1721.989-1675.8
 ```
 
-```{r RandHists, message=FALSE, warning=FALSE}
-set.seed(11)
-MyHistogram(rnorm(10,0,100))
-MyHistogram(rnorm(100,0,100))
-MyHistogram(rnorm(1000,0,100))
-MyHistogram(rnorm(10000,0,100))
-MyHistogram(rnorm(100000,0,100))
+What would a function to do this look like? It's quite simple. We provide a name for the function - let's call it `mm_diff` - followed by the assignment operator. Then the `function()` function with the single argument that we want to be input into the function. This can be called anything we want, and is only used inside the function - let's just call it `input`. Finally we put a space, and the formula we want to use for the expression. We can have anything we want here including other functions - in this case we want to take the `mean()` and `median()` of the `input` argument, and subtract them:
+
+```{r}
+mm_diff <- function(input) mean(input)-median(input)
 ```
 
-As you can see, at 10 observations there is very little evidence of any kind of structure, but even at 100 observations we can see something of a bell-like curve emerging as the mean and median approach each other. At 1,000 observations the difference between these measures is miniscule, and the distribution is clearly approaching the normal curve -- beyond this, at 10,000 or 100,000 observations, there are diminishing returns to be had as the difference between the mean and median approaches zero.
+Running this code creates the function, which we can now use:
 
-How "normal" is our F2 data that we looked at earlier? Let's review the frequency plot again.
+```{r}
+mm_diff(LIPP$F2)
+```
+
+One last point - what if we calculate our mean and median in the opposite order before subtracting?
+
+```{r}
+median(LIPP$F2)
+mean(LIPP$F2)
+1675.8-1721.989
+```
+
+We end up with a negative value this time, but we really just want to know how far apart the values are regardless of direction. The solution is to take the absolute value of the difference, which disregards the positive/negative sign of the result, using the `abs()` function:
+
+```{r}
+median(LIPP$F2)
+mean(LIPP$F2)
+abs(1675.8-1721.989)
+```
+
+Let's redefine our formula to include `abs()`:
+
+```{r}
+mm_diff <- function(input) abs(mean(input)-median(input))
+```
+
+Now this formula will give us a positive value for the difference between the mean and median of any distribution, no matter which is greater than the other. Ok, back to normal distributions...
+
+## Normal distributions (continued) {-}
+
+I'm going to create a formula which will generate a set of random numbers and produce a histogram of the resulting distribution along with information on the number of observations, the mean, the median, and the (absolute) difference between them.
+
+The base R function to generate a random set of numbers in a normal distribution is `rnorm()`. It takes three numbers as arguments - the number of observations, the central value of the distribution, and the Standard Deviation (S.D.). S.D. is a measure of variance in the sample data being examined -- a low S.D. indicates that most values are close to the mean, while larger values indicate that they are more spread out - I won't go into the formula for calcultating this. Here's a random set of 10 numbers from a normal distribution centred at 0 with an S.D. of 100:
+
+```{r}
+rnorm(10, 0, 100)
+```
+
+By the way, we can get the S.D. of this distribution by putting the `rnorm` function inside the `sd()` function. Would you expect the result to be 100? Let's see:
+
+```{r}
+sd(rnorm(10, 0, 100))
+```
+
+Since this is a random set, we won't get the same numbers every time - and the S.D. is *not* 100 every time! Try running the code above over and over - the result changes because it generates a different random set of numbers every time. But the average of the S.D.s, given enough time, would settle down to about 100 eventually.
+
+Ok back to the formula I was making. This formula will use `rnorm` to create a random set of observations, and produce a histogram. Let's start with the random numbers. I'll use the same centre of zero and S.D. of 100 every time, so the formula will only take one piece of input - the number of observations, or `n`:
+
+```{r}
+MyRandomHistogram <- function(n) rnorm(n, 0, 100)
+```
+
+We can try the formula:
+
+```{r}
+MyRandomHistogram(10)
+```
+
+Ok so this produces a set of 10 numbers, but not a histogram. To get the histogram we need a plot (I'll use `qplot()` to keep it simple) with the random generator inside it. Let's set a larger number of observations, 50:
+
+```{r}
+qplot(rnorm(50, 0, 100))
+```
+
+Let's add that to the function:
+
+```{r}
+MyRandomHistogram <- function(n) qplot(rnorm(n, 0, 100))
+```
+
+Now we can use the function, give it one number and get a random histogram
+
+```{r}
+MyRandomHistogram(50)
+```
+
+Notice that this histogram is different from the previous one even with the same number of observations, because they are randomly generated.
+
+The final thing I want to do with the function is to replace the x-axis title with some information on the number of observations, the mean and median values, and their difference. It's easty to add text to the qplot with the `xlab()` (for "x-label") function:
+
+```{r}
+qplot(rnorm(50, 0, 100)) +
+  xlab("n = 50")
+```
+
+To build all of this info into the title, I'm going to use the `paste()` function which simply "pastes" a series of elements together as text.
+
+```{r}
+paste(50, mean(50), median(50))
+```
+
+If we put the random generator inside the functions in `paste()`, we get:
+
+```{r}
+paste(50, mean(rnorm(50, 0, 100)), median(rnorm(50, 0, 100)))
+```
+
+This is accurate but a little hard to read, so I'll add text in between:
+
+```{r}
+paste("n =", 50, 
+      "; mean =", mean(rnorm(50, 0, 100)), 
+      "; median =", median(rnorm(50, 0, 100)))
+```
+
+Lastly, the difference between mean and median:
+
+```{r}
+paste("n =", 50, 
+      "; mean =", mean(rnorm(50, 0, 100)), 
+      "; median =", median(rnorm(50, 0, 100)),
+      "; difference =", abs(mean(rnorm(50, 0, 100))
+                       -median(rnorm(50, 0, 100))))
+```
+
+We can now add that to the formula, inside `xlab()`:
+
+```{r}
+MyRandomHistogram <- function(n) 
+  qplot(rnorm(n, 0, 100)) +
+  xlab(paste("n =", n, 
+      "; mean =", mean(rnorm(n, 0, 100)), 
+      "; median =", median(rnorm(n, 0, 100)),
+      "; difference =", abs(mean(rnorm(n, 0, 100))
+                       -median(rnorm(n, 0, 100)))))
+```
+
+```{r}
+MyRandomHistogram(50)
+```
+
+What this is intended to illustrate is how a *random set of observations* from a normal distribution is not itself necessarily normally distributed. A true normal distribution will have an identical mean and median, with a difference of zero, and will produce a bell-shaped histogram. This is not what we get using only 50 observations. Sometimes a bell-like shape appears, sometimes not. And rarely are the mean and median extremely close together.
+
+The more observations we add, however, the closer we get to a normal distribution. Let's see what happens by making a series of histograms using sets of random numbers containing just 10 observations, all the way up to 100,000 observations.
+
+```{r}
+MyRandomHistogram(10)
+MyRandomHistogram(100)
+MyRandomHistogram(1000)
+MyRandomHistogram(10000)
+MyRandomHistogram(100000)
+```
+
+You should get 5 randomly-generated histograms of observations drawn from a normal distribution. Because these are random, everyone will have a different set of results every time they run the above code. If you look through the histograms from smallest to largest n, the mean and median should get progressively closer together. This will not always be the case, however - you may get (small) increases in the difference even when n goes up, because of the randomness. But the final n=100,000 set should have a very small difference, close to zero.
+
+Typically at 10 observations there is very little evidence of any kind of structure, while at 100 observations something of a bell-like curve usually emerges as the mean and median approach each other. At 1,000 observations the difference between these measures is usually quite small, and the distribution is clearly approaching the normal curve -- beyond this, at 10,000 or 100,000 observations, there are diminishing returns to be had as the difference between the mean and median approaches zero.
+
+How "normal" is the data in LIPP? Let's look at F2:
 
 ``` {r}
-ggplot(data = LIPP, aes(x = F2)) +
-  geom_freqpoly(binwidth = 50) + 
-  theme_light()
+qplot(LIPP$F2, binwidth = 50)
 ```
 
-While the overall shape of this distribution is "bell-like" it is notably shifted or "skewed" towards one side, the lower end or left edge of the scale. Another useful visual assessment tool is the Q-Q "quantile-to-quantile" plot. The code below plots the Q-Q distribution of the data and then adds a diagonal line representing a normally-distributed dataset having the same mean and S.D. as the sample data.
+While the overall shape of this distribution is "bell-like" it is notably shifted or "skewed" towards one side, the lower end or left edge of the scale. 
+
+A useful visual assessment tool when it comes to normal distributions is the "quantile-to-quantile" or Q-Q plot. `qqnorm()` plots the Q-Q distribution of the data and `qqline()` adds a diagonal line indictaing where a normally-distributed dataset having the same mean and S.D. as the sample data would be.
 
 ```{r QQ1}
 qqnorm(LIPP$F2)
 qqline(LIPP$F2)
 ```
 
-The closer a set of observations adhere to the diagonal line in a Q-Q plot, the more normal their distribution. Once again, we see that at the lower end of the scale the distribution skews away from the normal line *to some extent*. But what does this mean precisely?
+The closer a set of observations adhere to the diagonal line in a Q-Q plot, the more normal their distribution. We see that especially at the lower end of the F2 scale, the distribution skews away from the normal line *to some extent*. But what does this mean precisely?
 
-To refine our visual observation that the distribution is mostly normal with some skewing, we can run a formal test. The Shapiro-Wilk normality test is useful for examining continuous distributions, such as vowel formant frequencies. This test as implemented in R does not function with datasets larger than n=5000. Since the number of LIPP F2 observations is greater than 16,000, we can simply restrict this to the first 5000 in running this test.
+To refine our visual observation that the distribution is mostly normal with some skewing, we can run a statistical test for normality. The Shapiro-Wilk normality test is useful for examining continuous distributions, such as vowel formant frequencies. This test as it is implemented in R does not function with datasets larger than n=5000. Since the number of LIPP observations is greater than 16,000, we can simply restrict this to the first 5000 in running this test. 
+
+To do this, we have to subset the data. This is done in R by putting square brackets after the variable and indicating the item or range of items you want to select. For example, we could select just the 1st F2 observation, or the 27th, or the 103rd through 109th:
 
 ```{r}
-length(LIPP$F2)
+LIPP$F2[1]
+LIPP$F2[27]
+LIPP$F2[103:109]
+```
+
+Let's run the Shapiro-Wilk test on the first 5000 observations of F2:
+
+```{r}
 shapiro.test(LIPP$F2[1:5000])
 ```
 
-The null hypothesis here is that the examined distribution is normal, so the low *p* value here indicates that we must *reject the null hypothesis* and conclude that the distribution is *not* normal (or, at least not perfectly normal). However, we also need to pay attention to the *W* score, which indicates the effect size. In this case, it indicates the degree of deviation from normality, with 1.0 indicating a perfectly normal distribution. The indicated value of 0.99658 is very, very close to this. Combining our observations of the frequency plot, Q-Q plot, and the Shapiro-Wilk test, we should conclude that the distribution is normal, but skewed slightly.
+The Shapiro-Wilk test takes as its null hypothesis that the set of observations being tested *do* come from a normal distribution. Finding a significant result as indicated by the *p* value indicates that we must *reject the null hypothesis* and conclude that the distribution is *not* normal (or, at least not perfectly normal).
+
+This is not the only output from the test, however. The *W* score indicates the degree of deviation from normality, with 1.0 indicating a perfectly normal distribution and lower values indicating less normal distributions. The indicated value of 0.99658 is very, very close to 1.0. Combining our observations of the frequency plot, Q-Q plot, and the Shapiro-Wilk test, we should conclude that the distribution of F2 in LIPP is fairly normal, but is skewed slightly, mostly in its lower range.
 
 > See this page for a discussion of how the Shapiro-Wilk test performs over many random datasets, and in particular how to evaluate the *W*-score: https://emilkirkegaard.dk/en/?p=4452
 
 Why test for normality? If a distribution is normal, this indicates the applicability of a range of parametric tests. However, for non-normal distributions, statisticians advise either transforming the data somehow, e.g. by taking the log or square root, or use one of a several non-parametric tests. In general parametric tests are more sensitive, especially for smaller datasets, so it is important to know how the data is distributed and take appropriate measures. However, as we'll see below, it often turns out that this is unnecessary when very large datasets are involved.
 
-## Testing normal distributions across groups: *t*-tests, ANOVAs and related tests
+# Testing of distributions: *t*-tests, ANOVAs and related tests
 
-We already looked at one parametric test: the *t*-test. Although we jumped in with it before we determined whether the data was normal, we have now determined that F2 is indeed normally distributed, so it was an appropriate test. The formula we used earlier evaluated the distributions of F2 split by speaker sex/gender, making this a *two-sample t*-test. To recall, that formula (and the result) was as follows.
+## *t*-tests
 
-```{r}
-t.test(x = LIPP$F2[LIPP$sex == "male"], 
-       y = LIPP$F2[LIPP$sex == "female"])
-```
-
-It's also possible to run a *one-sample t*-test, which we can easily do by simply putting the entire, non-subsetted F2 distribution in as the test variable.
+A while ago we looked at the differences in F2 distribution by speaker sex:
 
 ```{r}
-t.test(x = LIPP$F2)
+ggplot(data = LIPP, aes(x = F2)) +
+  geom_histogram(binwidth = 50) +
+  facet_wrap(. ~ sex)
 ```
 
-What does this result tell us? As the *alternative hypothesis* comment notes, this test determines that the true mean is not equal to zero. A mean of zero is the default setting for a one-sample *t*-test, but we can substitute any number we like -- let's try with 1715 Hz, which is *very* close to the true mean.
+Having observed  that the male & female speakers appear to have different F2 distributions, we might want to formally test this. A *t*-test is probably the simplest method for doing so, as it is designed to test one continuous variable - in this case F2 values - across two groups - in this case, speaker sex. The null hypothesis would be the assumption that the two distributions are statistically identical. *t* values greater than +/- 1.96 are considered significant, and would thus tell us we need to reject the null hypothesis and conclude that the distributions are different.
+
+The formula for the t-test resembles that used in a wide variety of statistical tests. The two variables being used to subset the data are put first separated by a tilde. The dependent variable is placed first - this is the variable being tested. The second, independent variable is used to subset the data - the dataset will be split into groups based on this variable, which are then compared against each other. Finally, we specify the dataset.
+
+
+``` {r}
+t.test(F2 ~ sex, data = LIPP)
+```
+
+The two most important results here are the *t* value and the *p* value. The *t* value tells us how great the difference is between the two groups, and the *p* value tells us whether this is likely to be a significant difference vs. just random chance.
+
+In fact, the *p* value in a t-test is just derived from the *t* value, with *t* values greater than +/- 1.96 being considered significant. In any case, because the *t* value is quite large and the *p* value is extremely small, we can comfortably reject the null hypothesis, and conclude that the LIPP female vs. male F2 distributions are substantially and significantly different from each other.
+
+It's also possible to run a *one-sample t*-test, which we can easily do by simply selecting F2 as the test variable.
+
+```{r}
+t.test(LIPP$F2)
+```
+
+What does this result tell us? As the *alternative hypothesis* comment notes, this test determines that the true mean is not equal to zero. A mean of zero is the default setting for a one-sample *t*-test, but we can substitute any number we like by adding the `mu` argument to the `t.test()` -- let's try with 1715 Hz, which is *very* close to the true mean.
 
 ```{r}
 t.test(x = LIPP$F2, mu = 1715)
 ```
 
-As we can see, the result here is still significant even in distinguishing between a mean and predicted value which are so close together, indicating how powerful the *t*-test can be. However, we should note carefully the difference between this and the earlier version where the mean was compared to a predicted value of zero: while both *p* values are quite small, indicative of significance (i.e. reject the null hypothesis), the *t* values are drastically different, indicating the relative effect size in each case. The first comparison to mean = zero has a *t* value of 1571.6, while the second comparison to mean = 1715 has a *t* value of only 6.4. So, the second test's output do tell us that the mean is definitely not 1715, but they also suggest that it's not very far away from that value, whereas the much higher *t* value of the first test indicates that the mean is indeed quite far from zero.
+As we can see, the result here is still significant even in distinguishing between a mean and predicted value which are so close together, indicating how powerful the *t*-test can be. However, we should note carefully the difference between this and the earlier version where the mean was compared to a predicted value of zero: while both *p* values are quite small, indicative of significance (i.e. reject the null hypothesis), the *t* values are drastically different, indicating the relative effect size in each case. The first comparison to mean = zero has a *t* value of 1571.6, while the second comparison to mean = 1715 has a *t* value of only 6.4. So, the second test's output does tell us that the mean is definitely not 1715, but also suggests that it's not very far away from 1715, whereas the much higher *t* value of the first test indicates that the mean is indeed quite far from zero.
 
 At any rate, when it comes to linguistic data, we are often looking at comparing across two groups, so the two-sample *t*-test is probably the more common implementation. Because the variable of sex/gender only has two levels in our data, male vs. female, the earlier 2-sample *t*-test covered everything we wanted to look at to evaluate the distributions relative to each other. Let's next explore the use of the *t*-test a bit more using some of the other variables in the data file. We can get a quick view of the whole data table by simply entering its name in R.
 
@@ -153,14 +305,13 @@ This quick view gives us the first 10 rows (i.e. observations) and 8 columns (i.
 table(LIPP$english_status)
 ```
 
-We have pretty similar numbers of observations for each status. We can use the same *t*-test formula we performed earlier for speaker sex/gender, and see if F2 differs significantly according to language status by making its two levels the x and y variables.
+We have pretty similar numbers of observations for each status. We can use the same *t*-test formula we performed earlier for speaker sex/gender, and see if F2 differs significantly according to English language status.
 
 ``` {r}
-t.test(x = LIPP$F2[LIPP$english_status == "L1"], 
-       y = LIPP$F2[LIPP$english_status == "L2"])
+t.test(F2 ~ english_status, data = LIPP)
 ```
 
-Recall that a *t* value of +/- 1.96 is usually considered significant, and the result here is much smaller than this, so we can't conclude that these two groups have different distributions. We can also see that the mean values are nearly identical, so this result makes sense.
+Recall that a *t* value of +/- 1.96 is usually considered significant. Becuase the *t* value of -0.75816 here is much smaller than +/- 1.96,  we can not conclude that these two groups have different distributions. The high *p* value of 0.4484 also tells us we can not reject the null hypothesis that the two distributions are essentially the same. And, we can also see that the mean values are nearly identical, so this result makes sense.
 
 In thinking about this some more, however, we still might want to examine the effect of first language status further -- what if we compared speakers of different languages to each other? Let's see the breakdown of the `language` variable.
 
@@ -168,14 +319,16 @@ In thinking about this some more, however, we still might want to examine the ef
 table(LIPP$language)
 ```
 
-English predominates, but we have at least 20,000 observations in each of the other three languages. Let's compare the two largest samples: English vs. Tagalog.
+English predominates, but we have at least 20,000 observations in each of the other three languages. Let's compare the two largest samples: English vs. Tagalog. To do this we need to change the formula in `t.test()` a little bit. We have to subset the data based on these two specific languages, using square brackets. And we will identify the two data subsets as the x and y variables inside `t.test()`:
 
 ``` {r}
 t.test(x = LIPP$F2[LIPP$language == "English"], 
        y = LIPP$F2[LIPP$language == "Tagalog"])
 ```
 
-This time the *t* value is a little larger, though still small, and the means are a tiny bit further apart. How about English vs. the other two languages, Ilocano and Kapampangan?
+This time the *t* value is a little larger, though still small, and the means are a tiny bit further apart. The large *p* value indicates we cannot reject the null hypothesis, and have to conclude these distributions are not statistically different from each other.
+
+What about English vs. the other two languages, Ilocano and Kapampangan?
 
 ``` {r}
 t.test(x = LIPP$F2[LIPP$language == "English"], 
@@ -187,9 +340,20 @@ t.test(x = LIPP$F2[LIPP$language == "English"],
        y = LIPP$F2[LIPP$language == "Kapampangan"])
 ```
 
-Now we get much larger *t* values, and both tests turn out to be significant, with mean F2 values that are more than 100 Hz apart, though in different directions: Ilocano speakers have a higher mean F2 indicating more fronted vowel production overall, while Kapampangan speakers have a lower F2, so more retracted vowel production overall.
+For each of these tests we get much larger *t* values, and miniscule *p* values which indicate statistical significance. The mean F2 values in each case are more than 100 Hz apart, though in different directions: Ilocano speakers have a higher mean F2 indicating more fronted vowel production overall, while Kapampangan speakers have a lower F2, so more retracted vowel production overall.
 
-> **Note:** We probably shouldn't conclude too much from these comparisons, as we are aggregating *all* of the vowels together here, so it's not very clear what these F2 differences mean. But we are just exploring the data here, and not trying to reach any large conclusions.
+Out of curiosity, what do these distributions look like in a plot? A density plot will accommodate the different token counts in each language - we can set the `fill` aesthetic to assign colour according to the `lanaguage` variable, and set a low `alpha` value inside `geom_density()` to allow us to see through the overlapping distributions
+
+```{r}
+LIPP %>% 
+  ggplot(aes(x = F2, fill = language)) +
+  geom_density(alpha = 0.4) +
+  scale_fill_viridis_d()
+```
+
+It's a little bit hard to read this, but we can see that the peak of the Kapampangan distribution is much lower on the F2 scale than the other languages. The other three largely overlap where their peaks are, but Ilocano has a bimodal distribution with a second, smaller peak at a higher F2 which bumps up its overall mean - hence the results we got earlier from the t-test.
+
+> **Note:** We probably shouldn't conclude too much from these comparisons, as we are aggregating *all* of the vowels together here, so it's not very clear what these F2 differences actually mean. But we are just exploring the data and learning how to run these tests here, rather than trying to reach any large conclusions about the data.
 
 We started with a comparison of F2 across the two language statuses in the data, and got a non-significant result. But, when we dug down a little further using the 4-level `language` variable, we discovered that there were some hidden differences which were significant. Furthermore, we haven't even explored this completely, as we could compare each language against each other language, rather than only looking at English vs. the others one by one. That would involve three additional *t*-tests. And if our variable had more than four levels (such as `vowel`), we would need even more tests. There must be a simpler method!
 
@@ -199,89 +363,125 @@ R has a built-in test for doing pairwise comparisons, i.e. exhaustively testing 
 pairwise.t.test(LIPP$F2, LIPP$language)
 ```
 
-An alternative to this is the Analysis of Variance or ANOVA, which was designed to extend the power of the *t*-test beyond two groups or categories. The formula for an ANOVA is: dependent.variable ~ independent.variable.
+The results here are just the *p* values which we obtained in the individual t-tests earlier.
+
+## ANOVA
+
+An alternative to the pairwise t-test is the Analysis of Variance or ANOVA, which was designed to extend the power of the *t*-test beyond two groups or categories. ANOVAs can be carried out with the `aov()` function using the formula: `dependent.variable ~ independent.variable` and selecting the data. Typically, the ANOVA is first stored as an object (which we will call `LIPPanova`) and then `summary()` is used to report the results. We'll see why shortly.
 
 ```{r}
 LIPPanova <- aov(F2 ~ language, data = LIPP)
 summary(LIPPanova)
 ```
 
-The ANOVA tests the null hypothesis that the dependent and independent variable are not correlated. Here, the very low *p* value indicates that there is good reason to reject this and conclude that there is a correlation -- but the ANOVA doesn't provide more detail than this on its own. However, it can be combined with the Tukey HSD ("honest significant difference") test to produce a more thorough analysis which includes pairwise comparisons across each group level. 
+The ANOVA tests the null hypothesis that the dependent and independent variables, here being `F2` and `language`, are not correlated. Here, the very low *p* value indicates that there is good reason to reject this and conclude that there *is* a correlation between these -- but the ANOVA doesn't provide any more detail than this on its own. 
+
+However, the ANOVA can be combined with the Tukey HSD ("honest significant difference") test to produce a more thorough analysis which includes pairwise comparisons across each group level. This is where the stored ANOVA object comes in handy, as we need to enter it into the `TukeyHSD()` function:
 
 ```{r}
 TukeyHSD(LIPPanova)
 ```
 
-Note that in each case, the pairwise test results indicate that only the Tagalog-English comparison produces a result which lacks statistical significance, although the exact *p* value differs in each case! This should be an indication that the *p* value does not always tell the whole story.
+Note that the *p* values in the pairwise test results indicate that only the Tagalog-English comparison produces a result which lacks statistical significance, although the exact *p* value differs from the one we got for the t-test, and for the ANOVA as a whole. This should be an indication that the *p* value does not always tell the whole story, and it's worth taking the time to understand what tests are reporting *aside* from the *p* value.
 
-One other thing to consider is the level of variance across the groups which the data is split across when doing an ANOVA. If the variance is non-equal, then the test may not be appropriate. Plotting residuals is one way to do this, and can be called with the ``plot()`` function after conducting an ANOVA -- the residuals are the first plot.
+## Variance and test selection
 
-```{r}
-LIPPanova <- aov(F2 ~ language, data = LIPP)
-plot(LIPPanova,1)
+Paired t-tests and ANOVAs are called "parametric" tests, which are designed for data which is normally distributed. If the data are not normally distributed, e.g. if one or multiple subsets of the data are skewed, then the variance across these groups is not equal, and these tests may not be appropriate.
+
+*Levene's test for homogeneity of variance* is designed to test if we have non-parametric (i.e. not normally-distributed) data. To run this test I'm using the `leveneTest()` function included in the `car` ("Companion to Applied Regression") so we'll need to install and load that first:
+
+```{r warning=FALSE}
+if(!require(car)){install.packages("car")}
+library(car)
+
+leveneTest(F2 ~ language, data = LIPP)
 ```
 
-Interpreting this plot is difficult. If one group has residuals much further away from the x-axis than the other groups, this suggests unequal variances. Outliers are indicated with a reference number, but it isn't clear how many indicate non-equal variance, or how far they should be.
+The low *p* value indicates that the groups in the independent variable (i.e. the different first languages associated with the various speakers) do have significantly differ variances within their respective distributions. This suggests that our earlier ANOVA was perhaps not an appropriate test for this data. 
 
-*Levene's test for homogeneity of variance* and the *Kruskal-Wallis rank sum test* are some other means of testing variance. The null hypothesis for both of these is that the variances present in each group's distribution are *not* significantly different -- so, a significant result here indicates that the variances *are* significantly different from each other.
+There are a few alternatives to the standard ANOVA. One is the "Kruskal-Wallis rank sum test" -- the `kruskal.test()` function is included with the `stats()` package:
 
 ```{r}
-leveneTest(F2 ~ language, data = LIPP)
+if(!require(stats)){install.packages("stats")}
+library(stats)
+
 kruskal.test(F2 ~ language, data = LIPP)
 ```
 
-The *p* values in each case are very low, indicating that the groups (i.e. speakers of different first languages) have significantly differ variances within their respective distributions. This suggests that our earlier ANOVA was perhaps not an appropriate test. Is there an alternative? In fact, yes -- Welch's one-way ANOVA doesn't assume equal variances.
+There is even a form of the ANOVA -- Welch's one-way ANOVA -- which doesn't assume equal variances.
 
 ```{r}
 oneway.test(F2 ~ language, data = LIPP)
 ```
 
-And furthermore, the pairwise *t*-test can be implemented for non-equal-variance comparisons by not pooling the standard deviations across groups.
+And furthermore, the pairwise *t*-test which we saw earlier *can* be implemented for non-equal-variance comparisons by not pooling the standard deviations across groups.
 
 ```{r}
 pairwise.t.test(LIPP$F2, LIPP$language, pool.sd = FALSE)
 ```
-It turns out that we get virtually the same results with these two tests as we did earlier. What does this indicate? The Central Limit Theorem (CLT) tells us that repeated random sampling will produce means which fall into a normal distribution, even when the originating data does not contain a precisely normal distribution. The practical impact of this is that, for very large datasets, it's usually sufficient to use parametric tests (e.g. *t*-tests, ANOVAs, etc.) even when the data is not normally distributed, and even when you *know* that it isn't. The only real issue with the CLT is that it is not known precisely what constitutes a "large enough" dataset. For a dataset such as we are using here, with > 160,000 observations. If your dataset is much smaller and you're unsure whether to use a parametric or non-parametric test, it's probably advisable to use a non-parametric test.
 
-Sonderegger et al. actually advise avoiding *t*-tests entirely and using the non-parametric Wilcox test.
+None of these tests provide the level of detail of the ANOVA -- but they all confirm that there are significant differences in F2 by first language, and the non-pooled pairwise t-test even gives near-identical results in terms of *p* values as the pooled version. What does this indicate? And do we need to worry about how parametric our data is?
+
+The Central Limit Theorem (CLT) tells us that repeated random sampling will produce means which fall into a normal distribution, even when the originating data does not contain a precisely normal distribution. This is something like (but a bit different) what we saw when we took random samples in increasingly large numbers -- the mean-median difference got progressively smaller as more data was added.
+
+The practical impact of this is that, for very large datasets, it's usually sufficient to use parametric tests (e.g. *t*-tests, ANOVAs, etc.) even when the data may not be normally distributed, and even when you *know* that it isn't! The only real issue with the CLT is that it is not known precisely what constitutes a "large enough" dataset. The dataset we are using here, with > 160,000 observations, seems to be substantially large enough that the CLT allows us to run parametric tests despite the data being underlyingly non-parametric. If your dataset is much smaller and you're unsure whether to use a parametric or non-parametric test, it's probably advisable to use a non-parametric test.
+
+Sonderegger et al. actually advise avoiding *t*-tests entirely and use the non-parametric Wilcoxon test instead:
 
 ```{r}
 wilcox.test(LIPP$F2[LIPP$sex == "male"],
             LIPP$F2[LIPP$sex == "female"])
 ```
 
-They note that for genuinely normal distributions, *t*-tests will produce more accurate *p* values, but that this is usually a small difference, and the Wilcox test is better as a general test. I don't have enough experience evaluating the difference between the two tests to make a strong claim one way or the other, but it is certain that the *t*-test is one of the most familiar statistical tests in wide usage, so it has a strong level of familiarity.
+They note that for genuinely normal distributions, *t*-tests will produce more accurate *p* values, but that this is usually a small difference, and the Wilcoxon test is better as a general test. I don't have enough experience evaluating the difference between the two tests to make a strong claim one way or the other, but it is certain that the *t*-test is one of the most familiar statistical tests in wide usage, so it has a strong level of familiarity.
 
-## Standard deviation, error and confidence intervals
+Hopefully the set of tests provided here give you a range of options to use -- but there are many, many other tests available.
 
-One of the basic statistical measures is the *standard deviation*, often abbreviated S.D.
+## Standard deviation, standard error and confidence intervals
+
+We discussed one of the basic statistical measures, the *standard deviation* or S.D., in the context of  random data samples earlier. What is the S.D. of the LIPP F2 distribution?
 
 ```{r}
 sd(LIPP$F2)
 ```
 
-S.D. is a measure of variance in the sample data being examined -- a low S.D. indicates that most values are close to the mean, while larger values indicate that they are more spread out. While S.D. is a measure of the sample which we have, *standard error (of the mean)* (S.E.)  tells us how likely it is that our sample -- or rather, its mean -- is a good estimate of the mean of larger poplulation which the sample represents, and which we can never accurately measure. There is no default function to calculate S.E. in R, but the formula is fairly straightforward, and can be calculated in two ways. 
+S.D. is a measure of variance in the sample data being examined -- a low S.D. indicates that most values are close to the mean, while larger values indicate that they are more spread out. While S.D. is a measure of the sample which we have, another similarly-named measure is the *standard error (of the mean)* or S.E. This tells us how likely it is that our sample -- or specifically, its mean value -- is a good estimate of the mean of larger population.
+
+>The basic concept behind statistical testing is that there is a true population -- in the case of linguistic data, this might be every single speaker of a language -- which we take a sample of, because we can never really exhaustively examine the entire population. Statistical tests are used to try and evaluate how likely it is that what we see in our sample is representative of what the population actually looks like -- but of course, we never really know for certain since we can't test the entire population (in most cases).
+
+ There is no default function to calculate S.E. in R, but the formula is fairly straightforward, and can be calculated in two ways. I'll use `function()` to create two S.E. functions -- `se1` and `se2` -- and then enter the LIPP F2 data into each one to show that they get the same result:
 
 ```{r}
 se1 <- function(x) sqrt(var(x)/length(x))
 se2 <- function(x) sd(x)/sqrt(length(x))
+
 se1(LIPP$F2)
 se2(LIPP$F2)
 ```
 
-The difference between S.D. and S.E. is that the former tells us about the distribution of variation within the sampled data, and S.E. tells us about how well our sample is representative of the larger population, and allows us to compute Confidence Intervals (CIs) which tell us where the true mean likely lies. If the S.E. is relatively small as compared to the S.D., then the confidence in our calculated mean falling close to the real mean is extremely high. CIs can be calculated for any percentage of the data range, but are typically calculated at 95% -- that is, the mean is estimated to fall within the CI range 95% of the time, which is generally accepted as the default for statistical signficance (cf. that 0.05 is the most commonly-used *p* value in many social sciences).
+The basic difference between S.D. and S.E. is that the former tells us about the distribution of variation *within our sampled data*, and S.E. tells us about *how well our sample is representative of the larger population*. S.E. also allows us to compute Confidence Intervals (CIs) which tell us where the true mean likely lies. If the S.E. is relatively small as compared to the S.D., then the confidence in our calculated mean falling close to the real mean is extremely high. CIs can be calculated for any percentage of the data range, but are typically calculated at 95% -- that is, the mean is estimated to fall within the CI range 95% of the time, which is generally accepted as the default for statistical signficance (cf. that 0.05 is the most commonly-used *p* value in many social sciences).
 
-CIs at 95% are equivalent to 1.96 times the S.E. +/- the mean. We can calculate all of these individually, or the `ci()` function in the `gmodels` package offers this functionality. Both give identical results.
+CIs at 95% are equivalent to 1.96 times the S.E. +/- the mean. We can calculate all of these individually:
+
 
 ```{r}
 # Mean of F2
 mean(LIPP$F2)
+
 # Standard Error of F2
 se1(LIPP$F2)
-# Lower 95% confidence interval of F2
+
+# Lower 95% confidence interval of F2: 1.96 * S.E. below the mean
 mean(LIPP$F2)-1.96*se1(LIPP$F2)
-# Upper 95% confidence interval of F2
+
+# Upper 95% confidence interval of F2: 1.96 * S.E. above the mean
 mean(LIPP$F2)+1.96*se1(LIPP$F2)
+```
+
+As an alternative, the `ci()` function in the `gmodels` package does the calculations for us, providing all the same numbers:
+
+```{r warning=FALSE}
+if(!require(gmodels)){install.packages("gmodels")}
 library(gmodels)
 ci(LIPP$F2)
 ```
