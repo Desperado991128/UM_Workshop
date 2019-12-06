@@ -36,10 +36,6 @@ LIPP <- read_csv("LIPP.csv")
 
 # Mixed-Effects Modeling
 
-<http://www.bodowinter.com/uploads/1/2/9/3/129362560/bw_lme_tutorial1.pdf>
-
-<http://www.bodowinter.com/uploads/1/2/9/3/129362560/bw_lme_tutorial2.pdf>
-
 One of the most common methods of statistical analysis in fields like sociolinguistics is mixed-effects (regression) modeling (MEM). As the full name implies, this is a type of regression model similar to linear regression, but with the addition of "mixed effects". As noted by Sonderegger et al., MEMs offer a range of benefits:
 
 > * More than one grouping unit can be included in the same model
@@ -52,6 +48,7 @@ The suitability of MEMs for statistical analysis of data from variationist socio
 
 
 
+<http://www.bodowinter.com/uploads/1/2/9/3/129362560/bw_lme_tutorial2.pdf>
 
 
 
