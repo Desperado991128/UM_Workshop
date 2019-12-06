@@ -1,5 +1,5 @@
 ---
-title: "Mixed Effects Modeling"
+title: "Mixed Linear Effects Modeling"
 subtitle: "Workshop on Statistics for Linguistics"
 author: "Sky Onosson, University of Manitoba"
 output: 
@@ -10,20 +10,26 @@ output:
 <big>
 
 ```{r, include=FALSE, message=F, warning=F}
-knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(echo = TRUE, fig.width=6, fig.height=4, fig.path='Figs/')
+library("knitr")
+opts_chunk$set(echo = TRUE)
 ```
 
-# Preliminaries
+---
 
-This section is simply here to load the necessary libraries and the main LIPP data file.
+## Agenda {-}
+
+* Mixed-Effects Modeling
+
+---
+
+## Load required packages and LIPP data {-}
 
 ```{r, message=F, warning=F}
 if(!require(tidyverse)){install.packages("tidyverse")}
-if(!require(viridisLite)){install.packages("viridisLite")}
-
 library(tidyverse)
-library(viridisLite)
+
+if(!require(viridis)){install.packages("viridis")}
+library(viridis)
 
 LIPP <- read_csv("LIPP.csv")
 ```

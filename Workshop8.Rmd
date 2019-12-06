@@ -1,0 +1,85 @@
+---
+title: "Unfinished"
+subtitle: "Workshop on Statistics for Linguistics"
+author: "Sky Onosson, University of Manitoba"
+output: 
+  html_document:
+    number_sections: true
+---
+
+<big>
+
+```{r, include=FALSE, message=F, warning=F}
+library("knitr")
+opts_chunk$set(echo = TRUE)
+```
+
+---
+
+## Agenda {-}
+
+* 
+
+---
+
+## Load required packages and LIPP data {-}
+
+```{r, message=F, warning=F}
+if(!require(tidyverse)){install.packages("tidyverse")}
+library(tidyverse)
+
+if(!require(viridis)){install.packages("viridis")}
+library(viridis)
+
+LIPP <- read_csv("LIPP.csv")
+```
+
+# Generalized Linear Modeling
+
+Generalized Linear Models (GLMs) are essentially an extension of linear models which do not assume a normal distribution for the outcome/effect/response variable, or allow it to be categorical/non-continuous. We will just look at one type of GLM: logistic regression.
+
+Logistic regression is a GLM where the outcome variable is **categorical** and, specifically, **binary** in nature -- that is, it is one of two types. The GLM code in this case is pretty finicky and relies on the levels being encoded as *exactly* 0 and 1 for the two binary levels. This means that if your data coding uses terms for the two levels -- such as e.g. "female" and "male" -- these need to be recoded on the fly. Luckily, this is fairly easy to do using the `mutate()` function in `dplyr`.
+
+As an illustration of logistic regression, let's look at the difference in duration between English lax vs. tense monophthongs. Lax vowels such as /ɪ, ɛ/ tend to have briefer durations than tense vowels such as /i, e/.
+
+> **Note**: an important exception to this is the vowel /æ/ which is typically counted as a lax vowel and yet tends to have a longer duration more similar to tense vowels.
+
+The code here is a little more involved than many previous examples. First, becuase three categories of vowel types are encoded in the original dataset -- *lax*, *tense*, and *diphthong* -- I set up a vector `monophthongs` which only includes the first two of these. Next, a `filter()` removes all non-monophthongs, as well as the vowels /æ/ (see note above) and schwa from the analysis. Next, I `mutate()` the `vowel_type` variable into a new variable simply called `type` by wrapping `vowel_type` inside both `as.factor()` (so R knows we are dealing with a factor -- this is sometimes critical) and `as.integer()`. The latter converts the various levels of `vowel_type` into integers, which R does beginning at 1 and increasing from there. Because we eliminated the *diphthong* level, there are only two, which will be categorized as 1 and 2 by `as.integer()`. However, because the `glm()` function will expect only 0 and 1 as input levels, the final step here is to subtract 1 from the `as.integer()` call inside the `mutate()` function. This finally provides the correct input for `glm()`. We indicate that the newly-created `type` variable is the first (categorical) factor, and `dur` (duration in seconds) is the second (continuous) factor, that we wish to perform a "family" analysis from the binomial (that is, logistic) class, and that the data will be drawn from the `dplyr` "pipe" via the "." -- we finally "pipe" this into a `summary()` function for the final output! 
+
+I have also included two plot calls -- a boxplot and a frequency graph -- using the same `filter()` function to illustrate visually the difference between the two groups of vowels. For each plot I have added a *1000 multiplier to the duration values to convert from seconds to milliseconds, and converted the duration axis to a logarithmic scale so that the lower range of the duration values (where most of the data lies) is more clear.
+
+```{r}
+monophthongs <- c("lax", "tense")
+LIPP %>%
+  filter(vowel_type %in% monophthongs,
+         vowel != "AE",
+         vowel != "AH") %>% 
+  mutate(type = as.integer(as.factor(vowel_type))-1) %>% 
+  glm(type ~ dur, family = binomial, data = .) %>% 
+  summary()
+
+LIPP %>%
+  filter(vowel_type %in% monophthongs,
+         vowel != "AE",
+         vowel != "AH") %>% 
+  ggplot(aes(vowel_type, dur*1000)) +
+  scale_y_log10() +
+  geom_boxplot()+ 
+  theme_light()
+
+LIPP %>%
+  filter(vowel_type %in% monophthongs,
+         vowel != "AE",
+         vowel != "AH") %>% 
+  ggplot(aes(x=dur*1000, colour=vowel_type)) +
+  geom_freqpoly() +
+  scale_colour_viridis_d() +
+  scale_x_log10() + 
+  theme_light()
+```
+
+The two plots both illustrate fairly well how the distributions of lax vs. tense vowels differ. The logistic regression output produces a few pieces of information which we can use to determine the statistical difference between the two vowel types. The *z* value is an indication of the relative strength of the model, while the familiar *p* value indicates the likelihood that this score is accurate for the population the sample is drawn from. We also have an AIC score reported -- this is the Akaike Information Criterion, which is another relative value which is difficult to evaluate simply on its own. The AIC is generally used when comparing different models to determine which is a more comprehensive analysis of the data -- a lower AIC typically indicates a stronger model.
+
+As I don't have a lot of experience using logistic regression, or much more to say about it beyond this, let's move on to the next topic.
+
+</big>
