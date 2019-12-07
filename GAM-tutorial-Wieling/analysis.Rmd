@@ -1,0 +1,1370 @@
+---
+title: Data, documentation and analysis scripts for *Analyzing dynamic phonetic data using generalized additive mixed modeling&#58; a tutorial focusing on articulatory differences between L1 and L2 speakers of English*
+author: "Martijn Wieling (University of Groningen, Haskins Laboratories, http://www.martijnwieling.nl)"
+date: "Generated on: `r date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: show
+    toc_float: 
+        collapsed: false
+        smooth_scroll: true
+    number_sections: true
+---
+
+# Abstract  
+
+
+In phonetics, many datasets are encountered which deal with dynamic data collected over time. Examples include diphthongal formant trajectories and articulator trajectories observed using electromagnetic articulography. Traditional approaches for analyzing this type of data generally aggregate data over a certain timespan, or only include measurements at a fixed time point (e.g., formant measurements at the midpoint of a vowel). In this paper, I discuss generalized additive modeling, a non-linear regression method which does not require aggregation or the pre-selection of a fixed time point. Instead, the method is able to identify general patterns over dynamically varying data, while simultaneously accounting for subject and item-related variability. An advantage of this approach is that patterns may be discovered which are hidden when data is aggregated or when a single time point is selected. A corresponding disadvantage is that these analyses are generally more time consuming and complex. This tutorial aims to overcome this disadvantage by providing a hands-on introduction to generalized additive modeling using articulatory trajectories from L1 and L2 speakers of English within the freely available R environment. All data and R code is made available to reproduce the analysis presented in this paper.
+
+Journal: Revised version submitted (January 4, 2018) to **Journal of Phonetics**
+
+Preprint: http://www.martijnwieling.nl/files/GAM-tutorial-Wieling.pdf
+
+*Keywords*: Generalized additive modeling, Tutorial, Articulography, Second language acquisition
+
+# Libraries and functions 
+The following commands load the necessary functions and libraries and show the version information.
+
+
+```{r setup, message=F, echo=F, eval=T}
+# some custom options to generate a nice html file
+options(digits = 3)
+options(width=100)
+library(knitr)
+opts_chunk$set(cache=F, comment='#', tidy = F, tidy.opts=list(blank=T, width.cutoff=100), fig.align='center', message=T, warning=T, fig.width=8, fig.height=5, dev='svg',eval=T)
+```
+
+
+``` {r init, message=F, eval=T}
+# install packages if not yet installed
+packages <- c("mgcv","itsadug","lme4","sp")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+
+# load required packages
+library(mgcv)
+library(itsadug)
+library(sp) # for colors which also print well in grayscale
+library(lme4)
+
+# version information
+R.version.string
+cat(paste("mgcv version:",packageVersion("mgcv")))
+cat(paste("itsadug version:",packageVersion("itsadug")))
+```
+
+# Dataset {.tabset}
+The following shows the columns of the full dataset and their explanation.
+
+```{r lookat}
+if (!file.exists("full.rda")) { 
+    download.file("http://www.let.rug.nl/wieling/Tutorial/full.rda","full.rda") # 2 MB
+}
+
+load("full.rda")
+```
+
+##  Column names
+
+The dataset consists of `r nrow(full)` rows and `r ncol(full)` columns with the following column names:
+
+```{r colnames}
+str(full)
+```
+
+## Data description
+
+* `Speaker` - ID of the speaker
+* `Lang` - Native language of the speaker (`"NL"` for Dutch, or `"EN"` for * English)
+* `Word` - The label of the word
+* `Sound` - The sound contrast (`"TH"` for words with the dental fricative, `"T"` for words with the stop)
+* `Loc` - The location where in the word the sound contrasts occurs (`"Init"` when it occurs at the beginning of the word or `"Final"` when it occurs at the back of the word)
+* `Trial` - The trial number of the word for each speaker
+* `Time` - The normalized (between 0: beginning of the word, to 1: end of the word)
+* `Pos` - The standardized (mean 0, standard deviation 1) position for each speaker of the T1 sensor in the anterior-posterior direction (higher values, more anterior)
+* `Pos01` - The normalized (1: most anterior, 0: most posterior) position for each speaker of the T1 sensor
+
+## Example data
+
+```{r head}
+head(full)
+```
+
+# Visualizing basis functions 
+
+```{r bf, echo=F, fig.width=10, fig.height=4.5}
+tmp = droplevels(full[full$Word %in% c("tent","tenth"),])
+tmp <- start_event(tmp,event=c("Speaker","Trial"))
+
+kk <- 10
+m <- 100
+m0 <- bam(Pos ~ s(Time, by=Word, k=kk) + Word, data = tmp)
+
+s <- get_modelterm(m0, select=2, n.grid=m, cond=list(as.data.frame=TRUE)) # tenth
+sdfr <- data.frame(Fitted = s$fit, Time = s$terms)
+sdfr <- sdfr[order(sdfr$Time),]
+
+sm <- smoothCon(s(Time,k=kk),data=tmp,knots=NULL)[[1]]
+X<-sm$X
+y <- fitted(m0) 
+b <- coef(lm(y~sm$X-1)) # getting penalized coefficients
+X0 <- t(PredictMat(sm,sdfr)) # basis functions without coefficients
+X <- b*t(PredictMat(sm,sdfr)) # basis functions including coefficients
+
+# plotting the first 10 basis functions
+par(mfrow=c(2,5))
+ind <- c(kk-1,kk,1:(kk-2))
+f <- X[1,]*0
+for (i in 1:kk) {
+	plot(seq(0,1,length.out=m),X0[ind[i],],type='l', main=paste('Basis function ',i,sep=''),xlab='',ylab='')
+}
+```
+
+# Comparing "tenth" and "tent"
+
+In the following, several models are fitted for the two words "tenth" and "tent".
+
+```{r subset} 
+words = c("tent","tenth")
+dat = droplevels(full[full$Word %in% words,])
+dat$Word = relevel(dat$Word,"tent") # tent is set as the reference level
+```
+
+## Fitting a linear model
+
+```{r m1, cache=T}
+m1 <- bam(Pos ~ Word, data=dat, method="fREML")
+(smry1 <- summary(m1))
+```
+
+## Fitting a non-linear model
+
+```{r m2, cache=T}
+m2 <- bam(Pos ~ Word + s(Time, by=Word, bs="tp", k=10), data=dat)
+(smry2 <- summary(m2))
+```
+
+```{r check, cache=T, fig.show="hide"}
+gam.check(m2)
+```
+
+## Visualizing the results
+
+```{r plotm2a, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m2, ylim=c(-1,2), select=1)
+abline(h=0)
+plot(m2, ylim=c(-1,2), select=2)
+abline(h=0)
+```
+
+
+```{r plotm2, cache=T, fig.width=4.5, fig.height=4.5}
+two.colors = bpy.colors(n = 2, cutoff.tails = 0.7, alpha = 1.0)
+plot_smooth(m2, view="Time", plot_all="Word", main="", rug=FALSE, ylim=c(-1,2), col=two.colors) 
+```
+
+
+```{r plotm2b, cache=T, fig.width=4.5, fig.height=4.5}
+plot_diff(m2, view="Time", comp=list(Word=c("tenth","tent")), ylim=c(-1,2))
+```
+
+## Complexity necessary?
+
+### Model comparison
+
+```{r m2comp, cache=T}
+m2a.ml <- bam(Pos ~ Word + s(Time), data=dat, method="ML")
+m2b.ml <- bam(Pos ~ Word + s(Time, by=Word), data=dat, method="ML")
+compareML(m2a.ml, m2b.ml)
+```
+
+### Binary difference smooth
+
+```{r m2bin, cache=T, fig.width=4.5}
+dat$IsTenth <- (dat$Word == "tenth")*1
+
+m2.bin <- bam(Pos ~ s(Time) + s(Time,by=IsTenth), data=dat)
+(smry2bin <- summary(m2.bin))
+
+plot(m2.bin, select=2, shade=TRUE, ylim=c(-1,2))
+abline(h=0)
+```
+
+#### Binary predictors: use only once!
+
+```{r binproblem, cache=T}
+summary(bam(Pos ~ s(Time) + s(Time,by=IsTenth) + s(Trial) + s(Trial,by=IsTenth), data=dat))
+summary(bam(Pos ~ s(Trial) + s(Trial,by=IsTenth) + s(Time) + s(Time,by=IsTenth), data=dat))
+```
+
+Note that the `edf` value for the binary smooths will differ by exactly 1 comparing these two models. The reason for this problematic order effect is that the model is not able to determine which of the binary difference smooths will include the constant difference between the two words.
+
+
+### Ordered factor difference
+
+```{r m2ord, cache=T, fig.width=4.5, fig.height=4.5}
+dat$WordO <- as.ordered(dat$Word)
+contrasts(dat$WordO) <- "contr.treatment"
+
+m2.ord <- bam(Pos ~ s(Time) + s(Time,by=WordO) + WordO, data=dat)
+(smrym2.ord <- summary(m2.ord))
+
+plot(m2.ord, select=2, shade=TRUE, ylim=c(-1,2))
+abline(h=0)
+```
+
+## Model criticism
+
+Model criticism shows the residuals are fine. 
+
+```{r m2mc, cache=T, dev="png", fig.height=8, out.width="90%", dpi=300}
+gam.check(m2)
+```
+
+## Mixed-effects
+
+### Random intercepts
+
+```{r m3, cache=T, fig.height=4.5}
+m3 <- bam(Pos ~ Word + s(Time, by=Word) + s(Speaker,bs="re"), data=dat)
+(smrym3 <- summary(m3))
+
+par(mfrow=c(1,2))
+plot_smooth(m3, view="Time", plot_all="Word", main="m3", rug=FALSE, rm.ranef=T, ylim=c(-1,2), 
+            col=two.colors)
+plot_diff(m3, view="Time", comp=list(Word=c("tenth","tent")), rm.ranef=T, ylim=c(-1,2))
+```
+
+### Random slopes
+
+```{r m4, cache=T, fig.height=4.5}
+m4 <- bam(Pos ~ Word + s(Time, by=Word) + s(Speaker,bs="re") + s(Speaker,Word,bs="re"), data=dat)
+(smrym4 <- summary(m4))
+
+compareML(m3,m4)
+
+par(mfrow=c(1,2))
+plot_smooth(m4, view="Time", plot_all="Word", main="m4", rug=FALSE, rm.ranef=T, ylim=c(-1,2), 
+            col=two.colors) 
+plot_diff(m4, view="Time", comp=list(Word=c("tenth","tent")), rm.ranef=T, ylim=c(-1,2))
+```
+
+### Factor smooths
+
+```{r m5, cache=T, fig.width=4.5, fig.height=4.5}
+m5 <- bam(Pos ~ Word + s(Time, by=Word) + s(Speaker,Word,bs="re") + s(Time,Speaker,bs="fs",m=1), 
+          data=dat)
+(smrym5 <- summary(m5))
+
+plot(m5, select=4)
+
+compareML(m4,m5)
+```
+
+```{r m5fig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot_smooth(m5, view="Time", plot_all="Word", main="m5", rug=FALSE, rm.ranef=T, ylim=c(-1,2), 
+            col=two.colors) 
+plot_diff(m5, view="Time", comp=list(Word=c("tenth","tent")), rm.ranef=T, ylim=c(-1,2))
+```
+
+```{r m6, cache=T, fig.height=4.5}
+m6 <- bam(Pos ~ Word + s(Time, by=Word) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat)
+(smrym6 <- summary(m6))
+compareML(m5,m6)
+
+par(mfrow=c(1,2))
+plot_smooth(m6, view="Time", plot_all="Word", main="m6", rug=FALSE, rm.ranef=T, ylim=c(-1,2), 
+            col=two.colors) 
+plot_diff(m6, view="Time", comp=list(Word=c("tenth","tent")), rm.ranef=T, ylim=c(-1,2))
+```
+
+## Autocorrelation
+
+```{r m7, cache=T, fig.width=4.5, fig.height=4.5}
+m6acf <- acf_resid(m6)
+(rhoval <- m6acf[2]) # autocorrelation at lag 1
+
+dat <- start_event(dat,event=c("Speaker","Trial"))
+
+m7 <- bam(Pos ~ Word + s(Time, by=Word) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+          rho=rhoval, AR.start=dat$start.event) 
+
+acf_resid(m7)
+
+summary(m7)
+```
+
+```{r m7fig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot_smooth(m7, view="Time", plot_all="Word", main="m7", rug=FALSE, rm.ranef=T, ylim=c(-1,2), 
+            col=two.colors) 
+plot_diff(m7, view="Time", comp=list(Word=c("tenth","tent")), rm.ranef=T, ylim=c(-1,2))
+```
+
+```{r m7alt, cache=T, fig.width=4.5, fig.height=4.5}
+m7.alt <- bam(Pos ~ Word + s(Time, by=Word) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+          rho=rhoval - 0.1, AR.start=dat$start.event) 
+
+acf_resid(m7.alt)
+```
+
+```{r m7alt2, cache=T, fig.width=4.5, fig.height=4.5, eval=F}
+m7.alt2 <- bam(Pos ~ Word + s(Time, by=Word) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+          rho=0.99, AR.start=dat$start.event) 
+
+acf_resid(m7.alt2)
+```
+
+```{r m7fig2, cache=T, fig.height=4.5, eval=F}
+par(mfrow=c(1,2))
+plot_smooth(m7.alt2, view="Time", plot_all="Word", main="m7.alt2", rug=FALSE, rm.ranef=T, ylim=c(-1,2), 
+            col=two.colors) 
+plot_diff(m7.alt2, view="Time", comp=list(Word=c("tenth","tent")), rm.ranef=T, ylim=c(-1,2))
+```
+
+
+
+
+## Tensor product interaction
+
+
+```{r m8, cache=T}
+m8 <- bam(Pos ~ Word + te(Time, Trial, by=Word) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+          rho=rhoval, AR.start=dat$start.event)
+(smrym8 <- summary(m8))
+```
+
+```{r m8fig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+fvisgam(m8, view=c("Time","Trial"), cond=list(Word=c("tent")), main="m8: tent", rm.ranef=T,
+        zlim=c(-0.9,1.6), ylim=c(0,600), color="gray") 
+fvisgam(m8, view=c("Time","Trial"), cond=list(Word=c("tenth")), main="m8: tenth", rm.ranef=T,
+        zlim=c(-0.9,1.6), ylim=c(0,600), color="gray") 
+plot_diff2(m8, view=c("Time","Trial"), comp=list(Word=c("tenth","tent")), rm.ranef=T,  se=0,
+           main="Difference tenth - tent", zlim=c(-0.1,1.2), ylim=c(0,600), color="gray")
+```
+
+```{r m8fig2, cache=T, fig.width=8, fig.height=12}
+par(mfcol=c(3,2))
+plot_diff2(m8, view=c("Time","Trial"), comp=list(Word=c("tenth","tent")), rm.ranef=T,  se=0,
+           main="Difference tenth - tent", zlim=c(-0.1,1.2), ylim=c(0,600), color="gray",
+           cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5) 
+abline(h=500,lty=2,lwd=2,col="white")
+
+plot_diff2(m8, view=c("Time","Trial"), comp=list(Word=c("tenth","tent")), rm.ranef=T,  se=0,
+           main="Difference tenth - tent", zlim=c(-0.1,1.2), ylim=c(0,600), color="gray",
+           cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5) 
+abline(h=300,lty=2,lwd=2,col="white")
+
+plot_diff2(m8, view=c("Time","Trial"), comp=list(Word=c("tenth","tent")), rm.ranef=T,  se=0,
+           main="Difference tenth - tent", zlim=c(-0.1,1.2), ylim=c(0,600), color="gray",
+           cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5) 
+abline(h=100,lty=2,lwd=2,col="white")
+
+plot_diff(m8, view="Time", comp=list(Word=c("tenth","tent")), cond=list(Trial=500), rm.ranef=T, 
+          main="Difference for trial 500", ylim=c(-1,2), cex.lab=1.5, cex.axis=1.5, 
+          cex.main=1.5, cex.sub=1.5) 
+abline(h=1.035,lty=3)
+abline(v=0.745,lty=3)
+
+plot_diff(m8, view="Time", comp=list(Word=c("tenth","tent")), cond=list(Trial=300), rm.ranef=T, 
+          main="Difference for trial 300", ylim=c(-1,2), cex.lab=1.5, cex.axis=1.5, 
+          cex.main=1.5, cex.sub=1.5)
+abline(h=1.035,lty=3)
+abline(v=0.745,lty=3)
+
+plot_diff(m8, view="Time", comp=list(Word=c("tenth","tent")), cond=list(Trial=100), rm.ranef=T, 
+          main="Difference for trial 100", ylim=c(-1,2), cex.lab=1.5, cex.axis=1.5, 
+          cex.main=1.5, cex.sub=1.5)
+abline(h=1.035,lty=3)
+abline(v=0.745,lty=3)
+```
+
+## Decomposition of tensor
+
+```{r m8dc, cache=T}
+m8.dc <- bam(Pos ~ Word + s(Time, by=Word) + s(Trial, by=Word) + ti(Time, Trial, by=Word) + 
+                   s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+             AR.start=dat$start.event)
+(smrym8.dc <- summary(m8.dc))
+```
+
+```{r m8dcfig, cache=F, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(m8.dc, select=1, shade=T, rug=F, cex.lab=1.35, cex.axis=1.35, cex.main=1.35, cex.sub=1.35,
+     ylim=c(-1.5,1.5))
+abline(h=0)
+plot(m8.dc, select=2, shade=T, rug=F, cex.lab=1.35, cex.axis=1.35, cex.main=1.35, cex.sub=1.35,
+     ylim=c(-1.5,1.5))
+abline(h=0)
+plot(m8.dc, select=3, shade=T, rug=F, cex.lab=1.35, cex.axis=1.35, cex.main=1.35, cex.sub=1.35,
+     ylim=c(-1.5,1.5))
+abline(h=0)
+plot(m8.dc, select=4, shade=T, rug=F, cex.lab=1.35, cex.axis=1.35, cex.main=1.35, cex.sub=1.35,
+     ylim=c(-1.5,1.5))
+abline(h=0)
+#plot(m8.dc, select=5, scheme=3, cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5, 
+#     contour.col='black', zlim=c(-0.2,0.2)) # non-significant: excluded
+#plot(m8.dc, select=6, scheme=3, cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5, 
+#     contour.col='black', zlim=c(-0.2,0.2)) # non-significant: excluded
+```
+
+```{r m8fig2b, cache=T, fig.width=8, fig.height=12, eval=F, echo=F}
+par(mfcol=c(3,2))
+pvisgam(m8.dc, view=c("Time","Trial"), select=6, color="gray", zlim=c(-1.5,1.5), 
+        main="m8.dc: ti for tenth")
+abline(h=400,lty=2,lwd=2,col="white")
+
+pvisgam(m8.dc, view=c("Time","Trial"), select=6, color="gray", zlim=c(-1.5,1.5), 
+        main="m8.dc: ti for tenth")
+abline(h=300,lty=2,lwd=2,col="white")
+
+pvisgam(m8.dc, view=c("Time","Trial"), select=6, color="gray", zlim=c(-1.5,1.5), 
+        main="m8.dc: ti for tenth")
+abline(h=200,lty=2,lwd=2,col="white")
+
+p <- get_modelterm(m8.dc, select=6, cond=list(Trial=400))
+emptyPlot(c(0,1), c(-1.5,1.5), h=0, main="Time pattern for trial 400")
+plot_error(p$terms[,1], p$fit, p$se.fit, shade=TRUE, xpd=TRUE)
+
+p <- get_modelterm(m8.dc, select=6, cond=list(Trial=300))
+emptyPlot(c(0,1), c(-1.5,1.5), h=0, main="Time pattern for trial 300")
+plot_error(p$terms[,1], p$fit, p$se.fit, shade=TRUE, xpd=TRUE)
+
+p <- get_modelterm(m8.dc, select=6, cond=list(Trial=200))
+emptyPlot(c(0,1), c(-1.5,1.5), h=0, main="Time pattern for trial 200")
+plot_error(p$terms[,1], p$fit, p$se.fit, shade=TRUE, xpd=TRUE)
+```
+
+
+## Including language difference
+
+```{r m9, cache=T}
+dat$WordLang <- interaction(dat$Word, dat$Lang)
+
+m9 <- bam(Pos ~ WordLang + s(Time, by=WordLang) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat,
+          rho=rhoval, AR.start=dat$start.event)
+(smrym9 <- summary(m9))
+```
+
+```{r m9fig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot_smooth(m9, view="Time", cond=list(WordLang=c("tent.EN")), main="m9: English speakers", 
+            rug=FALSE, rm.ranef=T, ylim=c(-1,2), col=two.colors[1]) 
+plot_smooth(m9, view="Time", cond=list(WordLang=c("tenth.EN")), rm.ranef=T, add=T, 
+            col=two.colors[2], rug=FALSE) 
+
+# add legend (from code of plot_smooth with parameter plot_all) 
+gfc <- getFigCoords()
+legend(gfc[2], gfc[4], legend = c("tent","tenth"), text.col = two.colors, text.font = 2, 
+       xjust = 1, yjust = 1, bty = "n", xpd = TRUE)
+
+plot_diff(m9, view="Time", comp=list(WordLang=c("tenth.EN","tent.EN")), rm.ranef=T, 
+          ylim=c(-1,2), main="Difference tenth - tent")
+
+plot_smooth(m9, view="Time", cond=list(WordLang=c("tent.NL")), main="m9: Dutch speakers", 
+            rug=FALSE, rm.ranef=T, ylim=c(-1,2), col=two.colors[1]) 
+
+plot_smooth(m9, view="Time", cond=list(WordLang=c("tenth.NL")), rm.ranef=T, add=T, 
+            col=two.colors[2], rug=FALSE) 
+
+# add legend
+gfc <- getFigCoords()
+legend(gfc[2], gfc[4], legend = c("tent","tenth"), text.col = two.colors, text.font = 2, 
+       xjust = 1, yjust = 1, bty = "n", xpd = TRUE)
+
+plot_diff(m9, view="Time", comp=list(WordLang=c("tenth.NL","tent.NL")), rm.ranef=T,
+          ylim=c(-1,2), main="Difference tenth - tent")
+```
+
+### Model comparison
+
+```{r m9cml, cache=T}
+m7.ml <- bam(Pos ~ Word + s(Time, by=Word) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+             rho=rhoval, AR.start=dat$start.event, method='ML') 
+
+m9.ml <- bam(Pos ~ WordLang + s(Time, by=WordLang) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat,
+          rho=rhoval, AR.start=dat$start.event, method='ML')
+
+compareML(m7.ml, m9.ml)
+```
+
+
+### Ordered factor
+
+```{r m9ord, cache=T}
+dat$ENTenthO <- as.ordered(dat$Lang == "EN" & dat$Word == "tenth") 
+contrasts(dat$ENTenthO) <- "contr.treatment"
+
+dat$NLTenthO <- as.ordered(dat$Lang == "NL" & dat$Word == "tenth") 
+contrasts(dat$NLTenthO) <- "contr.treatment"
+
+m9.ord <- bam(Pos ~ Lang + ENTenthO + NLTenthO + s(Time,by=Lang) + s(Time,by=ENTenthO) + 
+                    s(Time,by=NLTenthO) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+              rho=rhoval, AR.start=dat$start.event) 
+(smrym9.ord <- summary(m9.ord))
+```
+
+
+```{r m9ordfig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m9.ord,select=3,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9.ord: English difference")
+abline(h=0)
+plot(m9.ord,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9.ord: Dutch difference")
+abline(h=0)
+```
+
+#### Increasing k for `NLTenthO` smooth
+
+```{r m9ord20, cache=T}
+m9.ord20 <- bam(Pos ~ Lang + ENTenthO + NLTenthO + s(Time,by=Lang) + s(Time,by=ENTenthO) + 
+                      s(Time,by=NLTenthO,k=20) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+                rho=rhoval, AR.start=dat$start.event) 
+(smrym9.ord20 <- summary(m9.ord20))
+```
+
+```{r m9ml,cache=T, eval=T}
+m9.ord.ml <- bam(Pos ~ Lang + ENTenthO + NLTenthO + s(Time,by=Lang) + s(Time,by=ENTenthO) + 
+                       s(Time,by=NLTenthO) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+                 rho=rhoval, AR.start=dat$start.event, method='ML')
+m9.ord20.ml <- bam(Pos ~ Lang + ENTenthO + NLTenthO + s(Time,by=Lang) + s(Time,by=ENTenthO) + 
+                          s(Time,by=NLTenthO,k=20) + s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+                   rho=rhoval, AR.start=dat$start.event, method='ML')
+compareML(m9.ord.ml,m9.ord20.ml)
+```
+
+```{r m9ordfig20, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m9.ord20,select=3,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9.ord: English difference")
+abline(h=0)
+plot(m9.ord20,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9.ord: Dutch difference")
+abline(h=0)
+```
+
+#### Excluding the `NLTenthO` smooth
+
+```{r m9ord2, cache=T}
+m9.ord2 <- bam(Pos ~ Lang + ENTenthO + NLTenthO + s(Time,by=Lang) + s(Time,by=ENTenthO) + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, 
+                rho=rhoval, AR.start=dat$start.event) 
+(smrym9.ord2 <- summary(m9.ord2))
+```
+
+
+### Binary smooth
+
+```{r m9bin, cache=T}
+dat$IsENTenth <- (dat$Lang == "EN" & dat$Word == "tenth")*1 
+dat$IsNLTenth <- (dat$Lang == "NL" & dat$Word == "tenth")*1 
+m9.bin <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsENTenth) + s(Time,by=IsNLTenth,k=20) + 
+                    s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+              AR.start=dat$start.event) 
+(smrym9.bin <- summary(m9.bin))
+```
+
+```{r m9binfig, cache=T, fig.height=8, fig.width=8}
+par(mfrow=c(2,2))
+plot(m9.ord20,select=3,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9.ord: English difference")
+abline(h=0)
+plot(m9.ord20,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9.ord: Dutch difference")
+abline(h=0)
+plot(m9.bin,select=3,shade=T,rug=F, ylim=c(-1,1.999), main="m9.bin: English difference")
+abline(h=0)
+plot(m9.bin,select=4,shade=T,rug=F, ylim=c(-1,1.999), main="m9.bin: Dutch difference")
+abline(h=0)
+```
+
+## Differences different?
+
+### Binary smooth
+```{r m9bbin, cache=T}
+dat$IsTenth <- (dat$Word == "tenth")*1 
+m9b.bin <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+               AR.start=dat$start.event) 
+(smrym9b.bin <- summary(m9b.bin))
+```
+
+```{r m9bbinfig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m9b.bin,select=3,shade=T,rug=F, ylim=c(-1,2), main="m9b.bin: English difference")
+abline(h=0)
+plot(m9b.bin,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9b.bin: Dutch vs. English difference")
+abline(h=0)
+```
+
+#### Model criticism
+
+```{r m9mc, cache=T, dev="png", fig.height=8, out.width="90%", dpi=300}
+gam.check(m9b.bin)
+```
+
+### Ordered factor
+
+```{r m9bord, cache=T}
+dat$IsTenthO <- as.ordered(dat$Word == "tenth")
+contrasts(dat$IsTenthO) <- "contr.treatment"
+
+dat$IsNLTenthO <- as.ordered(dat$Lang == "NL" & dat$Word == "tenth") 
+contrasts(dat$IsNLTenthO) <- "contr.treatment"
+
+m9b.ord <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenthO) + IsTenthO + 
+                     s(Time,by=IsNLTenthO) + IsNLTenthO + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+               AR.start=dat$start.event) 
+(smrym9b.ord <- summary(m9b.ord))
+```
+
+```{r m9bord20, cache=T,eval=F}
+m9b.ord20 <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenthO) + IsTenthO + 
+                     s(Time,by=IsNLTenthO,k=20) + IsNLTenthO + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+                 AR.start=dat$start.event) 
+(smrym9b.ord20 <- summary(m9b.ord20))
+```
+
+
+```{r m9bordfig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m9b.ord,select=3,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9b.ord: English difference")
+abline(h=0)
+plot(m9b.ord,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9b.ord: Dutch vs. English difference")
+abline(h=0)
+```
+
+### Model comparison
+
+```{r m9binml, cache=T}
+m9b.bin.ml <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) +
+                         s(Time,Speaker,by=Word,bs="fs",m=1), data=dat,
+                   rho=rhoval, AR.start=dat$start.event, method='ML')
+
+m9a.bin.ml <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + 
+                        s(Time,Speaker,by=Word,bs="fs",m=1), data=dat,
+                  rho=rhoval, AR.start=dat$start.event, method='ML')
+
+compareML(m9a.bin.ml, m9b.bin.ml)
+```
+
+### Full binary model
+
+The following model shows that the difference between the Dutch and the English group for the word 'tent' is significant (`s(Time,by=IsNL)`). 
+
+```{r m9cbin, cache=T, eval=T, echo=T}
+dat$IsNL <- (dat$Lang == "NL")*1
+m9c.bin <- bam(Pos ~ Lang + s(Time) + s(Time,by=IsNL) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+               AR.start=dat$start.event) 
+(smrym9c.bin <- summary(m9c.bin))
+```
+
+## Differences different (at end)?
+
+### Binary smooth
+```{r m9dbin, cache=T}
+dat50 <- dat[dat$Time >= 0.5,] # only use time points in second half of word
+m9d.bin <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat50, rho=rhoval, 
+               AR.start=dat50$start.event) 
+(smrym9d.bin <- summary(m9d.bin))
+```
+
+```{r m9dbinfig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m9d.bin,select=3,shade=T,rug=F, ylim=c(-1,2), main="m9d.bin: English difference")
+abline(h=0)
+plot(m9d.bin,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9d.bin: Dutch vs. English difference")
+abline(h=0)
+```
+
+#### Model criticism
+
+```{r m9dmc, cache=T, dev="png", fig.height=8, out.width="90%", dpi=300}
+gam.check(m9d.bin)
+```
+
+### Ordered factor
+
+```{r m9dord, cache=T}
+m9d.ord <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenthO) + IsTenthO + 
+                     s(Time,by=IsNLTenthO) + IsNLTenthO + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat50, rho=rhoval, 
+               AR.start=dat50$start.event) 
+(smrym9d.ord <- summary(m9d.ord))
+```
+
+```{r m9dord20, cache=T,eval=F}
+m9d.ord20 <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenthO) + IsTenthO + 
+                     s(Time,by=IsNLTenthO,k=20) + IsNLTenthO + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat50, rho=rhoval, 
+                 AR.start=da60t$start.event) 
+(smrym9d.ord20 <- summary(m9d.ord20))
+```
+
+
+```{r m9dordfig, cache=T, fig.height=4.5}
+par(mfrow=c(1,2))
+plot(m9d.ord,select=3,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9d.ord: English difference")
+abline(h=0)
+plot(m9d.ord,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="m9d.ord: Dutch vs. English difference")
+abline(h=0)
+```
+
+### Model comparison
+
+```{r m9dbinml, cache=T}
+m9d.bin.ml <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) +
+                        s(Time,Speaker,by=Word,bs="fs",m=1), data=dat50,
+                   rho=rhoval, AR.start=dat50$start.event, method='ML')
+
+m9d9.bin.ml <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + 
+                         s(Time,Speaker,by=Word,bs="fs",m=1), data=dat50,
+                   rho=rhoval, AR.start=dat50$start.event, method='ML')
+
+compareML(m9d.bin.ml, m9d9.bin.ml)
+```
+
+### Full binary model
+
+The following model shows that the difference between the Dutch and the English group for the word 'tent' is significant (`s(Time,by=IsNL)`). 
+
+```{r m9ebin, cache=T, eval=T, echo=T}
+m9e.bin <- bam(Pos ~ Lang + s(Time) + s(Time,by=IsNL) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) + 
+                     s(Time,Speaker,by=Word,bs="fs",m=1), data=dat50, rho=rhoval, 
+               AR.start=dat50$start.event) 
+(smrym9e.bin <- summary(m9e.bin))
+```
+
+## Faster computation
+
+Note that the benefit of using more threads is greater for models which take longer to fit.
+
+```{r discrete2, cache=T}
+system.time(
+  m9b.bin <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + s(Time,by=IsNLTenth) + 
+                       s(Time,Speaker,by=Word,bs="fs",m=1), data=dat, rho=rhoval, 
+                 AR.start=dat$start.event) 
+)
+
+system.time(
+  m9b.bin.discrete <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + 
+                                s(Time,by=IsNLTenth) + s(Time,Speaker,by=Word,bs="fs",m=1), 
+                          data=dat, rho=rhoval, AR.start=dat$start.event, discrete=TRUE) 
+)
+
+system.time(
+  m9b.bin.discrete2 <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTenth) + 
+                                s(Time,by=IsNLTenth) + s(Time,Speaker,by=Word,bs="fs",m=1), 
+                          data=dat, rho=rhoval, AR.start=dat$start.event, discrete=TRUE,
+                          nthreads=2) 
+)
+
+(smrym9b.bin.discrete <- summary(m9b.bin.discrete))
+```
+
+```{r discretefig, cache=T, fig.height=4.5, eval=T}
+par(mfrow=c(1,2))
+plot(m9b.bin.discrete,select=3,shade=T,rug=F, ylim=c(-1,2), 
+     main="m9b.bin.discrete: English difference", cex.main=0.9)
+abline(h=0)
+
+plot(m9b.bin.discrete,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), 
+     main="m9b.bin.discrete: Dutch vs. English difference", cex.main=0.9)
+abline(h=0)
+```
+
+
+```{r discretefig2, cache=T, fig.width=8, fig.height=8, eval=F}
+par(mfrow=c(2,2))
+plot_smooth(m9b.bin.discrete, view="Time", cond=list(Lang=c("EN"),IsTenth=0,IsNLTenth=0), rug=FALSE,
+            rm.ranef=T, main="m9b.bin.discrete: English speakers", ylim=c(-1,2), col=two.colors[1]) 
+
+plot_smooth(m9b.bin.discrete, view="Time", cond=list(Lang=c("EN"),IsTenth=1,IsNLTenth=0), rm.ranef=T, add=T, 
+            col=two.colors[2], rug=FALSE) 
+
+# legend
+gfc <- getFigCoords()
+legend(gfc[2], gfc[4], legend = c("tent","tenth"), text.col = two.colors, text.font = 2, 
+       xjust = 1, yjust = 1, bty = "n", xpd = TRUE)
+
+plot(m9b.bin.discrete,select=3,shade=T,rug=F, ylim=c(-1,2), main="Difference tenth - tent")
+abline(h=0)
+
+plot_smooth(m9b.bin.discrete, view="Time", cond=list(Lang=c("NL"),IsTenth=0,IsNLTenth=0), rug=FALSE, 
+          rm.ranef=T, ylim=c(-1,2), main="m9b.bin.discrete: Dutch speakers", col=two.colors[1]) 
+
+plot_smooth(m9b.bin.discrete, view="Time", cond=list(Lang=c("NL"),IsTenth=1,IsNLTenth=1), rm.ranef=T, add=T, 
+            col=two.colors[2], rug=FALSE) 
+
+# legend
+gfc <- getFigCoords()
+legend(gfc[2], gfc[4], legend = c("tent","tenth"), text.col = two.colors, text.font = 2, 
+       xjust = 1, yjust = 1, bty = "n", xpd = TRUE)
+
+plot(m9b.bin.discrete,select=4,shade=T,rug=F, ylim=c(-1.5,1.5), main="Dutch vs. English difference")
+abline(h=0)
+```
+
+# Full model: word-final contrast
+
+```{r ffullc, cache=T}
+fullfinal <- droplevels(full[full$Loc == "Final" & full$Time >= 0.5,]) 
+fullfinal$IsTH = (fullfinal$Sound == "TH")*1
+fullfinal$IsNLTH = (fullfinal$Sound == "TH" & fullfinal$Lang == "NL")*1
+fullfinal <- start_event(fullfinal,event=c("Speaker","Trial"))
+
+system.time(
+  ffmc0 <- bam(Pos ~ Lang + s(Time, by=Lang) + s(Time, by=IsTH) +  s(Time, by=IsNLTH) + 
+                     s(Time,Speaker,by=Sound,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+               data=fullfinal, discrete=TRUE)
+)
+
+```
+
+```{r ffullc1, cache=T, fig.width=4.5, fig.height=4.5}
+ffmc0acf <- acf_resid(ffmc0)
+(rhoval <- ffmc0acf[2]) # autocorrelation at lag 1
+
+system.time(
+  ffmc1 <- bam(Pos ~ Lang + s(Time, by=Lang) + s(Time, by=IsTH) + s(Time, by=IsNLTH) + 
+                     s(Time,Speaker,by=Sound,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+               data=fullfinal, discrete=TRUE, rho=rhoval, AR.start=fullfinal$start.event)
+ )
+```
+
+```{r acfffullc, cache=F, fig.width=4.5, fig.height=4.5}
+acf_resid(ffmc1) 
+```
+
+
+```{r ffullc1smry, cache=T}
+(smryffmc1 <- summary(ffmc1))
+```
+
+```{r ffullc1fig, cache=T, fig.width=8, fig.height=4}
+par(mfrow=c(1,2))
+plot(ffmc1,select=3,shade=T,rug=F, ylim=c(-0.8,2.0), main="ffmc1: English difference")
+abline(h=0)
+plot(ffmc1,select=4,shade=T,rug=F, ylim=c(-1.8,1.0), main="ffmc1: Dutch vs. English difference")
+abline(h=0)
+```
+
+## Model criticism
+
+```{r ffullc1kmc, cache=T, dev="png", fig.width=8, fig.height=8, dpi=300, out.width="90%"}
+gam.check(ffmc1)
+```
+
+Model criticism shows that the distribution of the residuals is not normal. As it is similar to a scaled-$t$ model, we refit the model with setting `family="scat"`. Note that this is substantially slower (taking about 25-30 times as long).
+
+
+## Ordered factor model
+
+```{r ffullo0, cache=T}
+fullfinal$IsTHO <- as.ordered(fullfinal$Sound == "TH")
+contrasts(fullfinal$IsTHO) <- "contr.treatment"
+
+fullfinal$IsNLTHO <- as.ordered(fullfinal$Sound == "TH" & fullfinal$Lang == "NL")
+contrasts(fullfinal$IsNLTHO) <- "contr.treatment"
+
+system.time(
+  ffmo0 <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTHO) + IsTHO + 
+                     s(Time,by=IsNLTHO) + IsNLTHO + 
+                     s(Time,Speaker,by=Sound,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+               data=fullfinal, discrete=TRUE)
+)
+```
+
+```{r ffullo1, cache=T, fig.width=4.5, fig.height=4.5}
+ffmo0acf <- acf_resid(ffmo0)
+(rhoval <- ffmo0acf[2]) # autocorrelation at lag 1
+
+system.time(
+  ffmo1 <- bam(Pos ~ Lang + s(Time,by=Lang) + s(Time,by=IsTHO) + IsTHO + 
+                     s(Time,by=IsNLTHO) + IsNLTHO + 
+                     s(Time,Speaker,by=Sound,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+              data=fullfinal, discrete=TRUE, rho=rhoval, AR.start=fullfinal$start.event)
+)
+```
+
+```{r acfffullo, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(ffmo1)
+```
+
+
+```{r ffullo1smry, cache=T}
+(smryffmo1 <- summary(ffmo1))
+```
+
+```{r ffullo1fig, cache=T, fig.width=8, fig.height=4}
+par(mfrow=c(1,2))
+plot(ffmo1,select=3,shade=T,rug=F, ylim=c(-1.3,1.5), main="ffmo1: English difference")
+abline(h=0)
+plot(ffmo1,select=4,shade=T,rug=F, ylim=c(-1.3,1.5), main="ffmo1: Dutch vs. English difference")
+abline(h=0)
+```
+
+
+## Scaled-$t$ model
+
+```{r ffullc0s, cache=T}
+system.time(
+  ffmc0s <- bam(Pos ~ Lang + s(Time, by=Lang) + s(Time, by=IsTH) + s(Time, by=IsNLTH) + 
+                      s(Time,Speaker,by=Sound,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+                data=fullfinal, discrete=TRUE, family="scat")
+)
+
+ffmc0sacf <- acf_resid(ffmc0s)
+(rhoval <- ffmc0sacf[2]) # autocorrelation at lag 1
+``` 
+
+
+```{r ffullc1s, cache=T}
+system.time(
+  ffmc1s <- bam(Pos ~ Lang + s(Time, by=Lang) + s(Time, by=IsTH) + s(Time, by=IsNLTH) + 
+                      s(Time,Speaker,by=Sound,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+                data=fullfinal, discrete=TRUE, rho=rhoval, AR.start=fullfinal$start.event, 
+                family="scat")
+)
+``` 
+
+```{r ffullc1sacf, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(ffmc1s)
+```
+
+```{r ffullc1ssmry, cache=T}
+(smryffmc1s <- summary(ffmc1s))
+```
+
+```{r ffullc1sfig, cache=T, fig.width=8, fig.height=4}
+par(mfrow=c(1,2))
+plot(ffmc1s,select=3,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: English difference")
+abline(h=0)
+plot(ffmc1s,select=4,shade=T,rug=F, ylim=c(-1.8,1.0), main="fm1s: Dutch vs. English difference")
+abline(h=0)
+```
+
+### Model criticism
+
+```{r ffullc1smc, cache=T, dev="png", fig.width=8, fig.height=8, dpi=300, out.width="90%"}
+gam.check(ffmc1s)
+```
+
+
+# Full model
+
+In this section, we will assess if Dutch speakers contrast /&theta;/-words from /t/-words less strongly than English speakers for both word groups. Since we do not wish to explicitly contrast word-initial from word-final patterns, we create a model with four reference levels (the four possible combinations of language and location, combined into the variable `LangLoc`, below) and four binary difference smooths (`IsTHInit`, `IsTHFinal`, `IsNLTHInit`, and `IsNLTHFinal`, created below). The first two binary difference smooths will inform us about the difference between the /&theta;/-sound and /t/-sound for English speakers, separately for words in which the two sounds are word-initial and word-final. The final two difference smooths will indicate if these differences are substantially smaller for the Dutch speakers. As there might be individual speaker variability in how the sounds /&theta;/ and /t/ are pronounced depending on their location (word-initial or word-final), this will need to be included in the by-speaker factor smooth (using the variable `SoundLoc`, below). 
+
+```{r fullc, cache=T}
+full$LangLoc <- interaction(full$Lang, full$Loc)
+
+full$IsTHInit <- (full$Sound == "TH" & full$Loc == "Init")*1
+
+full$IsTHFinal <- (full$Sound == "TH" & full$Loc == "Final")*1
+
+full$IsNLTHInit <- (full$Lang == "NL" & full$Sound == "TH" & full$Loc == "Init")*1
+
+full$IsNLTHFinal <- (full$Lang == "NL" & full$Sound == "TH" & full$Loc == "Final")*1
+
+full$SoundLoc <- interaction(full$Sound, full$Loc)
+
+full <- start_event(full,event=c("Speaker","Trial"))
+
+system.time(
+  fmc0 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                    s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+              data=full, discrete=TRUE)
+)
+```
+
+```{r fullc1, cache=T, fig.width=4.5, fig.height=4.5}
+fmc0acf <- acf_resid(fmc0)
+(rhoval <- fmc0acf[2]) # autocorrelation at lag 1
+
+system.time(
+  fmc1 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                    s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+              data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event)
+)
+```
+
+```{r acffullc, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(fmc1)
+```
+
+
+```{r fullc1smry, cache=T}
+(smryfmc1 <- summary(fmc1))
+```
+
+```{r fullc1fig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(fmc1,select=5,shade=T,rug=F, ylim=c(-0.8,2.0), main="fmc1: English difference initial")
+abline(h=0)
+plot(fmc1,select=6,shade=T,rug=F, ylim=c(-0.8,2.0), main="fmc1: English difference final")
+abline(h=0)
+plot(fmc1,select=7,shade=T,rug=F, ylim=c(-1.8,1.0), main="fmc1: Dutch vs. English difference initial")
+abline(h=0)
+plot(fmc1,select=8,shade=T,rug=F, ylim=c(-1.8,1.0), main="fmc1: Dutch vs. English difference final")
+abline(h=0)
+```
+
+## Model criticism
+
+```{r fullc1kmc, cache=T, dev="png", fig.width=8, fig.height=8, dpi=300, out.width="90%"}
+gam.check(fmc1)
+```
+
+Model criticism shows that the distribution of the residuals is not normal. As it is similar to a scaled-$t$ model, we refit the model with setting `family="scat"`. Note that this is substantially slower (taking about 25-30 times as long).
+
+## Ordered factor model
+
+```{r fullo0, cache=T}
+full$IsTHInitO <- as.ordered(full$Sound == "TH" & full$Loc == "Init")
+contrasts(full$IsTHInitO) <- "contr.treatment"
+
+full$IsTHFinalO <- as.ordered(full$Sound == "TH" & full$Loc == "Final")
+contrasts(full$IsTHFinalO) <- "contr.treatment"
+
+full$IsNLTHInitO <- as.ordered(full$Sound == "TH" & full$Loc == "Init" & full$Lang == "NL")
+contrasts(full$IsNLTHInitO) <- "contr.treatment"
+
+full$IsNLTHFinalO <- as.ordered(full$Sound == "TH" & full$Loc == "Final" & full$Lang == "NL")
+contrasts(full$IsNLTHFinalO) <- "contr.treatment"
+
+system.time(
+  fmo0 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInitO) + IsTHInitO + 
+                    s(Time,by=IsTHFinalO) + IsTHFinalO + s(Time,by=IsNLTHInitO) + IsNLTHInitO + 
+                    s(Time,by=IsNLTHFinalO) + IsNLTHFinalO + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+              data=full, discrete=TRUE)
+)
+```
+
+```{r fullo1, cache=T, fig.width=4.5, fig.height=4.5}
+fmo0acf <- acf_resid(fmo0)
+(rhoval <- fmo0acf[2]) # autocorrelation at lag 1
+
+system.time(
+  fmo1 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInitO) + IsTHInitO + 
+                    s(Time,by=IsTHFinalO) + IsTHFinalO + s(Time,by=IsNLTHInitO) + IsNLTHInitO + 
+                    s(Time,by=IsNLTHFinalO) + IsNLTHFinalO + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+              data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event)
+)
+```
+
+```{r acffullo, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(fmo1)
+```
+
+
+```{r fullo1smry, cache=T}
+(smryfmo1 <- summary(fmo1))
+```
+
+```{r fullo1fig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(fmo1,select=5,shade=T,rug=F, ylim=c(-1.3,1.5), main="fmo1: English difference initial")
+abline(h=0)
+plot(fmo1,select=6,shade=T,rug=F, ylim=c(-1.3,1.5), main="fmo1: English difference final")
+abline(h=0)
+plot(fmo1,select=7,shade=T,rug=F, ylim=c(-1.3,1.5), main="fmo1: Dutch vs. English difference initial")
+abline(h=0)
+plot(fmo1,select=8,shade=T,rug=F, ylim=c(-1.3,1.5), main="fmo1: Dutch vs. English difference final")
+abline(h=0)
+```
+
+## Model comparison
+
+```{r fullbmc, cache=T}
+system.time(
+  fmc1.ml <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                       s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                       s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+                 data=full, method="ML", rho=rhoval, AR.start=full$start.event)
+)
+
+system.time(
+  fmc1a.ml <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                        s(Time,by=IsNLTHInit) +
+                        s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+                  data=full, method="ML", rho=rhoval, AR.start=full$start.event)
+)
+
+system.time(
+  fmc1b.ml <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                        s(Time,by=IsNLTHFinal) + 
+                        s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+                  data=full, method="ML", rho=rhoval, AR.start=full$start.event)
+)
+
+system.time(
+  fmc1c.ml <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                        s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+                  data=full, method="ML", rho=rhoval, AR.start=full$start.event)
+)
+
+compareML(fmc1a.ml,fmc1.ml)
+compareML(fmc1b.ml,fmc1.ml)
+compareML(fmc1c.ml,fmc1.ml)
+```
+
+## `k` set to 20
+
+```{r full1k, cache=T, fig.width=4.5, fig.height=4.5}
+system.time(
+  fmk1 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + s(Time,by=IsTHFinal) +
+                    s(Time, by=IsNLTHInit, k=20) + s(Time, by=IsNLTHFinal, k=20) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+              data=full, discrete=TRUE, rho=0.963, AR.start=full$start.event)
+)
+```
+
+```{r acffullk, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(fmk1)
+```
+
+
+```{r fullk1smry, cache=T}
+(smryfmk1 <- summary(fmk1))
+```
+
+```{r fullk1fig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(fmk1,select=5,shade=T,rug=F, ylim=c(-0.8,2.0), main="fmk1: English difference initial")
+abline(h=0)
+plot(fmk1,select=6,shade=T,rug=F, ylim=c(-0.8,2.0), main="fmk1: English difference final")
+abline(h=0)
+plot(fmk1,select=7,shade=T,rug=F, ylim=c(-1.8,1.0), main="fmk1: Dutch vs. English difference initial")
+abline(h=0)
+plot(fmk1,select=8,shade=T,rug=F, ylim=c(-1.8,1.0), main="fmk1: Dutch vs. English difference final")
+abline(h=0)
+```
+
+## Per language
+
+```{r full0, cache=T}
+full$IsENTHInit <- (full$Lang == "EN" & full$Sound == "TH" & full$Loc == "Init")*1
+
+full$IsENTHFinal <- (full$Lang == "EN" & full$Sound == "TH" & full$Loc == "Final")*1
+
+system.time(
+  fm0 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsENTHInit) + s(Time,by=IsENTHFinal) +
+                   s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+             data=full, discrete=TRUE)
+)
+```
+
+```{r full1, cache=T, fig.width=4.5, fig.height=4.5}
+fm0acf <- acf_resid(fm0)
+(rhoval <- fm0acf[2]) # autocorrelation at lag 1
+
+system.time(
+  fm1 <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsENTHInit) + s(Time,by=IsENTHFinal) +
+                   s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1), 
+             data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event)
+)
+```
+
+```{r acffull, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(fm1)
+```
+
+
+```{r full1smry, cache=T}
+(smryfm1 <- summary(fm1))
+```
+
+```{r full1fig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(fm1,select=5,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1: English difference initial")
+abline(h=0)
+plot(fm1,select=6,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1: English difference final")
+abline(h=0)
+plot(fm1,select=7,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1: Dutch difference initial")
+abline(h=0)
+plot(fm1,select=8,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1: Dutch difference final")
+abline(h=0)
+```
+
+
+# Full model: scaled-$t$
+
+```{r fullc0s, cache=T}
+system.time(
+  fmc0s <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                    s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+              data=full, discrete=TRUE, family="scat")
+)
+
+fmc0sacf <- acf_resid(fmc0s)
+(rhoval <- fmc0sacf[2]) # autocorrelation at lag 1
+``` 
+
+
+```{r fullc1s, cache=T}
+system.time(
+  fmc1s <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                    s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+              data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat")
+)
+``` 
+
+```{r fullc1sacf, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(fmc1s)
+```
+
+```{r fullc1ssmry, cache=T}
+(smryfmc1s <- summary(fmc1s))
+```
+
+```{r fullc1sfig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(fmc1s,select=5,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: English difference initial")
+abline(h=0)
+plot(fmc1s,select=6,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: English difference final")
+abline(h=0)
+plot(fmc1s,select=7,shade=T,rug=F, ylim=c(-1.8,1.0), main="fm1s: Dutch vs. English difference initial")
+abline(h=0)
+plot(fmc1s,select=8,shade=T,rug=F, ylim=c(-1.8,1.0), main="fm1s: Dutch vs. English difference final")
+abline(h=0)
+```
+
+## Model criticism
+
+```{r fullc1smc, cache=T, dev="png", fig.width=8, fig.height=8, dpi=300, out.width="90%"}
+gam.check(fmc1s)
+```
+
+## Per language
+
+```{r full0s, cache=T}
+system.time(
+  fm0s <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                    s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+              data=full, discrete=TRUE, family="scat")
+)
+
+fm0sacf <- acf_resid(fm0s)
+(rhoval <- fm0sacf[2]) # autocorrelation at lag 1
+``` 
+
+```{r full1s, cache=T}
+system.time(
+  fm1s <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsENTHInit) + 
+                    s(Time,by=IsENTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                    s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+              data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat")
+)
+``` 
+
+```{r full1sacf, cache=T, fig.width=4.5, fig.height=4.5}
+acf_resid(fm1s)
+```
+
+```{r full1ssmry, cache=T}
+(smryfm1s <- summary(fm1s)) 
+```
+
+```{r full1sfig, cache=T, fig.width=8, fig.height=8}
+par(mfrow=c(2,2))
+plot(fm1s,select=5,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: English difference initial")
+abline(h=0)
+plot(fm1s,select=6,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: English difference final")
+abline(h=0)
+plot(fm1s,select=7,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: Dutch difference initial")
+abline(h=0)
+plot(fm1s,select=8,shade=T,rug=F, ylim=c(-0.8,2.0), main="fm1s: Dutch difference final")
+abline(h=0)
+```
+
+```{r full1smc, cache=T, dev="png", fig.width=8, fig.height=8, dpi=300, out.width="90%", eval=F}
+gam.check(fm1s)
+```
+
+
+# Speedup with `nthreads` 
+
+```{r multproc, cache=T}
+# Using 2 processors
+system.time(
+  tmp <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                   s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+             data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat",
+             nthreads=2)
+)
+
+# Using 4 processors
+system.time(
+  tmp <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                   s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+             data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat",
+             nthreads=4)
+)
+
+# Using 8 processors
+system.time(
+  tmp <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                   s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+             data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat",
+             nthreads=8)
+)
+
+# Using 16 processors
+system.time(
+  tmp <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                   s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+             data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat",
+             nthreads=16)
+)
+
+# Using 32 processors
+system.time(
+  tmp <- bam(Pos ~ LangLoc + s(Time,by=LangLoc) + s(Time,by=IsTHInit) + 
+                   s(Time,by=IsTHFinal) + s(Time,by=IsNLTHInit) + s(Time,by=IsNLTHFinal) + 
+                   s(Time,Speaker,by=SoundLoc,bs="fs",m=1) + s(Time,Word,by=Lang,bs="fs",m=1),
+             data=full, discrete=TRUE, rho=rhoval, AR.start=full$start.event, family="scat",
+             nthreads=32)
+)
+```
+
+
+
+```{r lmer, fig.width=4.5, fig.height=4.5, echo=F}
+# Linear mixed modeling
+library(lme4)
+agg = aggregate(Pos ~ Speaker + Lang + Word + Sound + Loc + Trial, FUN=mean, data=full) # aggregated data
+summary(m1 <- lmer(Pos ~ Lang*Sound + (1+Lang|Word) + (1+Sound|Speaker), data=agg))
+qqnorm(resid(m1))
+qqline(resid(m1))
+```
+
+# Replication
+To replicate the analysis presented above, you can just copy the following lines to the most recent version of R. Please note that you first need to install [Pandoc](http://johnmacfarlane.net/pandoc/). 
+
+```{r knitr, eval=F}
+download.file("http://www.let.rug.nl/wieling/Tutorial/analysis.Rmd", "analysis.Rmd")
+if (length(setdiff("rmarkdown", rownames(installed.packages()))) > 0) {
+  install.packages("rmarkdown")  
+}
+library(rmarkdown)
+render("analysis.Rmd") # generates html file with results
+browseURL(paste("file://", file.path(getwd(),"analysis.html"), sep="")) # shows result
+```
