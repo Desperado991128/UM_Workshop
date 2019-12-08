@@ -38,7 +38,7 @@ First, we will install and load the `tidyverse` R package. We will also install/
 
 As I have a common form of colour blindness (red/green), I find a lot of plots made with R's default colour palette to be really hard to read. Viridis solves a lot of those problems.
 
-```{r, message=F, warning=F}
+```{r preliminaries, message=F, warning=F}
 if(!require(tidyverse)){install.packages("tidyverse")}
 library(tidyverse)
 
@@ -52,7 +52,7 @@ To load the LIPP data we will use the `read_csv` function from the tidyverse and
 
 >**Note:** it is also possible to put an equals sign `=` instead of the assignment operator. I do *not* recommend getting in the habit of doing this for a few reasons. #1 the assignment operator indicates the direction of the assignment: the information on the *right* is assigned to the object on the *left*. And #2 the double equals sign `==` is used to check data values, and this is easily confused with `=` if you're not careful.
 
-``` {r}
+``` {r load_lipp}
 LIPP <- read_csv("LIPP.csv")
 ```
 
@@ -68,7 +68,7 @@ After storing the data in the `LIPP` object, we get some feedback in the form of
 
 We will run through a few ways of investigating a dataset such as the LIPP .csv which we loaded earlier as `LIPP`. We can get a view of the data by simply entering the name of the object into R:
 
-```{r}
+```{r lipp}
 LIPP
 ```
 
@@ -78,7 +78,7 @@ Columns 9-11 list the mean formant measurements for each vowel. We'll start by f
 
 There are a *lot* of ways to explore the data, and there's really no right or wrong place to begin. It really depends what kind of question you are trying to answer. Let's say you were interested in seeing, on average, how far forward the average vowel articulation was in the data, which would be correlated with F2. We could get the mean of all the F2 values:
 
-```{r}
+```{r f2}
 mean(LIPP$F2)
 ```
 
@@ -88,7 +88,7 @@ This is the basic format for a lot of simple functions dealing with a data table
 
 To begin, let's look at the distribution of F2 across all speakers and all vowels. F2 is measured in Hz and, because it could potentially have any (positive) value, is a *continuous* variable. A histogram is a common way to examine continuous variables, so let's see 2 ways to make one. The first involves the 'quick-plot' function `qplot()`, which takes limited input and is intended for producing plots when you just want to see the results quickly but don't care so much about tweaking the details. All you need to do is enter the names of the `data table` and the `variable`, separated by a `$`.
 
-``` {r}
+``` {r lipp$f2}
 qplot(LIPP$F2)
 ```
 
@@ -96,7 +96,7 @@ We get a warning about selecting a better 'binwidth', which is the numerical wid
 
 `qplot` allows another way to enter the data as well (and a lot of other functions use this format): list the variable alone, and the data object separately:
 
-``` {r}
+``` {r qplot}
 qplot(F2, data = LIPP)
 ```
 
@@ -104,7 +104,7 @@ This produces ths same output as before, with the exception of the label on the 
 
 The second histogram plotting method involves putting one function inside another. The base plot function is `ggplot()` which was introduced before. If we only specified the data object, we get this:
 
-```{r}
+```{r empty}
 ggplot(data = LIPP)
 ```
 
@@ -112,7 +112,7 @@ Just a blank plot. We need to add the variable we want to map using the `aes()` 
 
 >`aes()` stands for "aesthetic", the tidyverse term for the mapping of data onto visual elements such as coordinates, colours, shapes, etc.
 
-```{r}
+```{r grid}
 ggplot(data = LIPP, aes(x = F2))
 ```
 
@@ -120,39 +120,39 @@ This plot is not completely blank - we have some numbers on the x-axis and grid 
 
 >From my understanding, this type of structure, with `ggplot()` elements separated by `+`, is probably going to change at some point in the future, but don't quote me on that.
 
-``` {r}
+``` {r histogram}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_histogram()
 ```
 
 This produces a 100% identical plot to the (second) one we made with `qplot()` earlier. We also get the same warning here because we didn't specify any bin width, but we can now do so. Let's choose '50', i.e. every 50 Hz will be in a different bin. This is done inside the `geom_histogram()` function using the `binwidth` argument.
 
-``` {r}
+``` {r binwidth}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_histogram(binwidth = 50)
 ```
 
 As an aside, you can find out all of the available options and structures for a given function by either entering it in the search box at the upper right of Rstudio, or by typing a `?` followed by the name of the function at the prompt in the Console. This will pull up the Description page for that function under the Help tab in the upper right.
 
-```{r}
+```{r help}
 ?ggplot
 ```
 
 There are a **lot** of geoms to choose from:
 
-```{r}
+```{r geoms}
 include_graphics("images/ggplot.png")
 ```
 
 Since we are plotting one variable which is continuous, let's focus on the available geoms for that option:
 
-```{r}
+```{r continuous}
 include_graphics("images/ggplot_one_variable.png")
 ```
 
 `geom_freqpoly` works much like a histogram but produces a contour outline of the data distribution - a *frequency polygon* - rather than stacked bins, although it still uses the binwidth argument as it is built around the same underlying data structure. Setting a reasonably fine-grained binwidth produces a smooth contour outline.
 
-``` {r}
+``` {r geom_freqpoly}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_freqpoly(binwidth = 50)
 ```
@@ -161,14 +161,14 @@ ggplot(data = LIPP, aes(x = F2)) +
 
 Another similar geom is the `geom_area()` plot. This function maps data using a variety of "stat"s for different purposes - we will specify the stat as "bin" in this case so the data is "binned" in the same way that it is for a histogram or frequency polygon
 
-``` {r}
+``` {r geom_area}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_area(stat = "bin", binwidth = 50)
 ```
 
 It is possible to alter the shading of the area plot by adjusting the "alpha" value which ranges between 0 (fully transparent) and 1 (completely shaded).
 
-``` {r}
+``` {r alpha}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_area(stat = "bin", binwidth = 50, alpha = 0.5)
 ```
@@ -177,7 +177,7 @@ Adjusting alpha in this way can be really useful when multiple data distribution
 
 One of the nicest features of ggplot is the ability to "facet" data. This takes a ggplot structure and divides it according a set of criteria, producing multiple sub-plots covering the various levels of whichever variable we specify. Let's see some of the variables present in the LIPP dataset:
 
-```{r}
+```{r variables}
 LIPP
 ```
 
@@ -185,7 +185,7 @@ LIPP
 
 To get a summary of the categories or levels present for a given variable, you can use the `table()` function:
 
-```{r}
+```{r table}
 table(LIPP$sex)
 ```
 
@@ -195,17 +195,17 @@ table(LIPP$sex)
 
 One of the questions we could ask is whether there are production differences between the voices of speakers classified as *female* or *male* in the LIPP data. One way to achieve this is to 'facet' the F2 distributions by sex.
 
-To facet data by some variable, add the `facet_wrap()` function to the `ggplot` call. Inside `facet_wrap()`, put a period (this works as a placeholder, for reasons to be discussed below) and a tilde followed by the variable we wish to facet by.
+To facet data by some variable, add the `facet_wrap()` function to the `ggplot` call. Inside `facet_wrap()`, put a tilde followed by the variable we wish to facet by.
 
-``` {r}
+``` {r facet_wrap_one}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_freqpoly(binwidth = 50) +
-  facet_wrap(. ~ sex)
+  facet_wrap(~ sex)
 ```
 
-If you are wondering if you can facet by more than one variable, the answer is yes! Replace the period by some other variable, e.g. "language". This will produce sub-plots faceted by all the various combinations of sex and language:
+If you are wondering if you can facet by more than one variable, the answer is yes! Add another variable, e.g. "language" before the tilde. This will produce sub-plots faceted by all the various combinations of sex and language:
 
-``` {r}
+``` {r facet_wrap_two}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_freqpoly(binwidth = 50) +
   facet_wrap(language ~ sex)
@@ -215,7 +215,7 @@ ggplot(data = LIPP, aes(x = F2)) +
 
 Since each sub-facet has drastically different numbers of tokens, it's hard to see how these distributions compare. An alternative geom which is more useful in this case is `geom_density`. This reports distributions in a way which relativizes differences in token counts, allowing greater ease of comparison across categories. I'll just use the original plot faceted for speaker sex here:
 
-``` {r}
+``` {r geom_density}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_density() +
   facet_wrap(language ~ sex)
@@ -223,7 +223,7 @@ ggplot(data = LIPP, aes(x = F2)) +
 
 Let's use this geom with faceting applied only to speaker sex:
 
-``` {r}
+``` {r geom_density_sex}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_density() +
   facet_wrap(. ~ sex)
@@ -235,28 +235,28 @@ It looks like these distributions are different, but we could have a better visu
 
 One alternative to faceting is use the `colour` aesthetic to map speaker sex. This goes inside `ggplot(aes())` just like "x = F2":
 
-``` {r}
+``` {r colour}
 ggplot(data = LIPP, aes(x = F2, colour = sex)) +
   geom_density()
 ```
 
 Another option is to use the `fill` instead of the `colour` aesthetic:
 
-``` {r}
+``` {r fill}
 ggplot(data = LIPP, aes(x = F2, fill = sex)) +
   geom_density()
 ```
 
 When we do this, we can also adjust the alpha to make the fills semi-transparent, in order to more easily see the differences between the distributions:
 
-``` {r}
+``` {r fill_alpha}
 ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
   geom_density()
 ```
 
 While we are playing around with plotting options, notice that adjusting the alpha caused it to appear in the legend, which probably is not wanted. We can override this by adding a specification in the `guides()` function to the ggplot call:
 
-``` {r}
+``` {r guides}
 ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
   geom_density() +
   guides(alpha = FALSE)
@@ -264,7 +264,7 @@ ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
 
 One of the other common plot functions is `labs()` which provides a number of different labelling options. You can add a plot title and subtitle, and change the labels of any of the aesthetic mappings, including ones (such as "y" in this case) which are not originally specified in the ggplot call.
 
-``` {r}
+``` {r labs}
 ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
   geom_density() +
   guides(alpha = FALSE) +
@@ -279,7 +279,7 @@ While we are looking at adjusting plot visuals, I am going to demonstrate two mo
 
 `viridis` provides several different functions depending what we are applying the colour scheme to. Depending on whether we have the `colour` or `fill` aesthetic, use `scale_colour_viridis()` or `scale_fill_viridis()` respectively. We then need to specify if we are using a discrete or categorical variable, which is done by adding `discrete = TRUE/FALSE` inside the function. In this case, we have a categorical variable, so we want `discrete = TRUE`:
 
-``` {r}
+``` {r viridis}
 ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
   geom_density() +
   guides(alpha = FALSE) +
@@ -315,7 +315,7 @@ Finally... we will look at some of the ggplot themes. These alter the general lo
 
 I like `theme_minimal` in a lot of cases, so let's try adding it:
 
-``` {r}
+``` {r theme_minimal}
 ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
   geom_density() +
   guides(alpha = FALSE) +
@@ -332,7 +332,7 @@ ggplot(data = LIPP, aes(x = F2, fill = sex, alpha = 0.7)) +
 
 How does this work with a categorical variable having more than two levels? Let's see the variable `vowel` in the LIPP data:
 
-```{r}
+```{r vowel}
 table(LIPP$vowel)
 ```
 
@@ -340,7 +340,7 @@ table(LIPP$vowel)
 
 Let's try mapping fill to `vowel` instead of `sex`:
 
-``` {r}
+``` {r vowel_fill}
 ggplot(data = LIPP, aes(x = F2, fill = vowel, alpha = 0.7)) +
   geom_density() +
   guides(alpha = FALSE) +
@@ -355,7 +355,7 @@ ggplot(data = LIPP, aes(x = F2, fill = vowel, alpha = 0.7)) +
 
 In this case, overlapping density distributions is fairly hard to work with given the number of categories. Let's try faceting instead. There are a few necessary changes that need to be made to this plot call to accomplish this - hopefully you can predict what needs to be changed.
 
-``` {r}
+``` {r vowel_facet}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_density() +
   guides(alpha = FALSE) +
@@ -363,13 +363,13 @@ ggplot(data = LIPP, aes(x = F2)) +
        subtitle = "Faceted by vowel",
        x = "F2 (Hz)",
        y = "Token density") +
-  facet_wrap(. ~ vowel) +
+  facet_wrap(~ vowel) +
   theme_minimal()
 ```
 
 A final useful tool at this stage is to be able to save plots, allowing you to use them in presentations, papers, or other documents. The very handy function `ggsave()` does this. The simplest usage needs you to only specify the filename, and will default to saving the last generated plot into the currently-used folder with some default size. Filetype is specified right in the filename, and can include .jpg, .png, .bmp etc. I usually use .pdf as these render nicely at all kinds of scales. You can alter plot size and a variety of other elements inside `ggsave()`, but I won't go into those options here.
 
-```{r}
+```{r ggsave}
 ggsave("LIPP_vowels_F2.pdf")
 ```
 

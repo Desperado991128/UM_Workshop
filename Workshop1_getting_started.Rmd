@@ -9,7 +9,7 @@ output:
 
 <big>
 
-```{r, include=FALSE, message=F, warning=F}
+```{r preliminaries, include=FALSE, message=F, warning=F}
 library("knitr")
 opts_chunk$set(echo = TRUE)
 ```
@@ -41,6 +41,9 @@ I am not a statistician, and in fact I have never taken a proper statistics or r
 
 What I can do is describe to you how to manage linguistic data in R, how to apply a variety of statistical functions and tests to that data, and how to produce output in a variety of forms which are usable in presentations, talks, papers, etc.
 
+Here's my email address for anyone who doesn't already have it - I'm always happy to discuss issues related to R and linguistics! 
+><sky@onosson.com>
+
 ---
 
 # Installing the necessary software
@@ -49,7 +52,7 @@ What I can do is describe to you how to manage linguistic data in R, how to appl
 
 The first and most essential software package you require is R itself, which is "a free software environment for statistical computing and graphics". If you don't have R installed, go to <https://muug.ca/mirror/cran/> and download the appropriate version for your operating system:
 
-```{r echo = FALSE}
+```{r download_r, echo = FALSE}
 include_graphics("images/download_r.png")
 ```
 
@@ -65,7 +68,7 @@ After installing R, you will need to install RStudio:
 
 It's possible to do everything we will be doing in the workshop using just R on its own, but RStudio makes working with R a lot easier in a variety of ways. Get R here https://rstudio.com/products/rstudio/download/ and install it.
 
-```{r echo = FALSE}
+```{r download_rstudio, echo = FALSE}
 include_graphics("images/download_rstudio.png")
 ```
 
@@ -79,7 +82,7 @@ I am planning to run the entire workshop inside RStudio rather than using Powerp
 
 The files I will be using in the workshop are located here: <https://github.com/onosson/UM_Workshop>
 
-```{r echo = FALSE}
+```{r github_files, echo = FALSE}
 include_graphics("images/github.png")
 ```
 
@@ -89,7 +92,7 @@ Assuming that you downloaded the .zip file, locate it in your computer and unzip
 
 Inside the folder is an RStudio project file: `UM_Workshop.Rproj`. Opening that file *should* open up RStudio.
 
-```{r echo = FALSE}
+```{r rstudio_window, echo = FALSE}
 include_graphics("images/project_window.png")
 ```
 
@@ -97,7 +100,7 @@ If for some reason this does not work, open RStudio manually, and go to:
 
 >`File > New Project...`
 
-```{r echo = FALSE}
+```{r new_project, echo = FALSE}
 include_graphics("images/new_project.png")
 ```
 
@@ -115,11 +118,11 @@ RStudio is divided into 4 "panes". The default layout has the source code (where
 
 One of the nice things about RStudio is that you can adjust how it looks and operates. I use a non-standard theme which alters the colour scheme, and a non-standard font as well as modifying some of the panes arrangements. This is all done within the RStudio preferences/settings.
 
-```{r echo = FALSE}
+```{r rstudio_themes, echo = FALSE}
 include_graphics("images/themes.png")
 ```
 
-```{r echo = FALSE}
+```{r rstudio_panes, echo = FALSE}
 include_graphics("images/panes.png")
 ```
 
@@ -128,6 +131,8 @@ I find that when I am coding for extended periods of time, it really helps to ha
 ## R Markdown
 
 The main workshop files are written in R Markdown, which is a "markup" language that can generate a variety of document types including .html, .pdf, .doc etc. using simplified syntax. One of its nicest features is that you can include "chunks" of R code within the document text, which can be run inside of RStudio. This not only generates output, but lets you work with the code directly, which is why I am using this format for the workshop. In order to run R Markdown files properly, you may need to install some R packages.
+
+>Since you should now have the .rmd file loaded in RStudio, you are currently reading R Markdown code -- hopefully you can see how "light" of a coding language it is.
 
 ## R packages
 
@@ -143,13 +148,13 @@ Packages are bundles of functions (and sometimes data) which are downloaded into
 
 Installing packages makes them available, but by default when you start an R session user-installed packages are not loaded. To do this, use the `library()` function as in the following code snippet:
 
-```{r}
+```{r library_rmarkdown}
 library("rmarkdown")
 ```
 
 Finally, once you have the `rmarkdown` package installed and loaded, and you have an .Rmd file open, you can "knit" it into a formatted document for viewing. To do this, click the `Knit` dropdown menu at the top of the .Rmd file, and (in this case) select `Knit to HTML`.
 
-```{r echo = FALSE}
+```{r knit_to_html, echo = FALSE}
 include_graphics("images/knit.png")
 ```
 

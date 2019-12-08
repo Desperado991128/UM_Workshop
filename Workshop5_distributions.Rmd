@@ -9,7 +9,7 @@ output:
 
 <big>
 
-```{r, include=FALSE, message=F, warning=F}
+```{r knitr, include=FALSE, message=F, warning=F}
 library("knitr")
 opts_chunk$set(echo = TRUE)
 ```
@@ -25,7 +25,7 @@ opts_chunk$set(echo = TRUE)
 
 ## Load required packages and LIPP data {-}
 
-```{r, message=F, warning=F}
+```{r preliminaries, message=F, warning=F}
 if(!require(tidyverse)){install.packages("tidyverse")}
 library(tidyverse)
 
@@ -39,7 +39,7 @@ LIPP <- read_csv("LIPP.csv")
 
 Let's look at a quickplot of F2 in the LIPP data.
 
-```{r}
+```{r qplot}
 qplot(LIPP$F2)
 ```
 
@@ -53,7 +53,7 @@ Every R package contains a set of custom functions, and it's possible to build y
 
 Let's say we wanted to create a function to determine the difference between the mean and the median in a set of data. We could do this manually by getting each value and then subtracting one from the other:
 
-```{r}
+```{r mean_median}
 mean(LIPP$F2)
 median(LIPP$F2)
 1721.989-1675.8
@@ -61,19 +61,19 @@ median(LIPP$F2)
 
 What would a function to do this look like? It's quite simple. We provide a name for the function - let's call it `mm_diff` - followed by the assignment operator. Then the `function()` function with the single argument that we want to be input into the function. This can be called anything we want, and is only used inside the function - let's just call it `input`. Finally we put a space, and the formula we want to use for the expression. We can have anything we want here including other functions - in this case we want to take the `mean()` and `median()` of the `input` argument, and subtract them:
 
-```{r}
+```{r mm_diff_define}
 mm_diff <- function(input) mean(input)-median(input)
 ```
 
 Running this code creates the function, which we can now use:
 
-```{r}
+```{r mm_diff}
 mm_diff(LIPP$F2)
 ```
 
 One last point - what if we calculate our mean and median in the opposite order before subtracting?
 
-```{r}
+```{r reverse}
 median(LIPP$F2)
 mean(LIPP$F2)
 1675.8-1721.989
@@ -81,7 +81,7 @@ mean(LIPP$F2)
 
 We end up with a negative value this time, but we really just want to know how far apart the values are regardless of direction. The solution is to take the absolute value of the difference, which disregards the positive/negative sign of the result, using the `abs()` function:
 
-```{r}
+```{r abs}
 median(LIPP$F2)
 mean(LIPP$F2)
 abs(1675.8-1721.989)
@@ -89,7 +89,7 @@ abs(1675.8-1721.989)
 
 Let's redefine our formula to include `abs()`:
 
-```{r}
+```{r redefine}
 mm_diff <- function(input) abs(mean(input)-median(input))
 ```
 
@@ -101,13 +101,13 @@ I'm going to create a formula which will generate a set of random numbers and pr
 
 The base R function to generate a random set of numbers in a normal distribution is `rnorm()`. It takes three numbers as arguments - the number of observations, the central value of the distribution, and the Standard Deviation (S.D.). S.D. is a measure of variance in the sample data being examined -- a low S.D. indicates that most values are close to the mean, while larger values indicate that they are more spread out - I won't go into the formula for calcultating this. Here's a random set of 10 numbers from a normal distribution centred at 0 with an S.D. of 100:
 
-```{r}
+```{r rnorm}
 rnorm(10, 0, 100)
 ```
 
 By the way, we can get the S.D. of this distribution by putting the `rnorm` function inside the `sd()` function. Would you expect the result to be 100? Let's see:
 
-```{r}
+```{r sd}
 sd(rnorm(10, 0, 100))
 ```
 
@@ -115,31 +115,31 @@ Since this is a random set, we won't get the same numbers every time - and the S
 
 Ok back to the formula I was making. This formula will use `rnorm` to create a random set of observations, and produce a histogram. Let's start with the random numbers. I'll use the same centre of zero and S.D. of 100 every time, so the formula will only take one piece of input - the number of observations, or `n`:
 
-```{r}
+```{r define_MyRandomHistogram}
 MyRandomHistogram <- function(n) rnorm(n, 0, 100)
 ```
 
 We can try the formula:
 
-```{r}
+```{r MyRandomHistogram}
 MyRandomHistogram(10)
 ```
 
 Ok so this produces a set of 10 numbers, but not a histogram. To get the histogram we need a plot (I'll use `qplot()` to keep it simple) with the random generator inside it. Let's set a larger number of observations, 50:
 
-```{r}
+```{r qplot_rnorm}
 qplot(rnorm(50, 0, 100))
 ```
 
 Let's add that to the function:
 
-```{r}
+```{r redefine_MyRandomHistogram}
 MyRandomHistogram <- function(n) qplot(rnorm(n, 0, 100))
 ```
 
 Now we can use the function, give it one number and get a random histogram
 
-```{r}
+```{r MyRandomHistogram_50}
 MyRandomHistogram(50)
 ```
 
@@ -147,26 +147,26 @@ Notice that this histogram is different from the previous one even with the same
 
 The final thing I want to do with the function is to replace the x-axis title with some information on the number of observations, the mean and median values, and their difference. It's easty to add text to the qplot with the `xlab()` (for "x-label") function:
 
-```{r}
+```{r xlab}
 qplot(rnorm(50, 0, 100)) +
   xlab("n = 50")
 ```
 
 To build all of this info into the title, I'm going to use the `paste()` function which simply "pastes" a series of elements together as text.
 
-```{r}
+```{r paste}
 paste(50, mean(50), median(50))
 ```
 
 If we put the random generator inside the functions in `paste()`, we get:
 
-```{r}
+```{r paste_rnorm}
 paste(50, mean(rnorm(50, 0, 100)), median(rnorm(50, 0, 100)))
 ```
 
 This is accurate but a little hard to read, so I'll add text in between:
 
-```{r}
+```{r expand}
 paste("n =", 50, 
       "; mean =", mean(rnorm(50, 0, 100)), 
       "; median =", median(rnorm(50, 0, 100)))
@@ -174,7 +174,7 @@ paste("n =", 50,
 
 Lastly, the difference between mean and median:
 
-```{r}
+```{r add_diff}
 paste("n =", 50, 
       "; mean =", mean(rnorm(50, 0, 100)), 
       "; median =", median(rnorm(50, 0, 100)),
@@ -184,7 +184,7 @@ paste("n =", 50,
 
 We can now add that to the formula, inside `xlab()`:
 
-```{r}
+```{r xlab_MyRandomHistogram}
 MyRandomHistogram <- function(n) 
   qplot(rnorm(n, 0, 100)) +
   xlab(paste("n =", n, 
@@ -194,7 +194,7 @@ MyRandomHistogram <- function(n)
                        -median(rnorm(n, 0, 100)))))
 ```
 
-```{r}
+```{r 50_again}
 MyRandomHistogram(50)
 ```
 
@@ -202,7 +202,7 @@ What this is intended to illustrate is how a *random set of observations* from a
 
 The more observations we add, however, the closer we get to a normal distribution. Let's see what happens by making a series of histograms using sets of random numbers containing just 10 observations, all the way up to 100,000 observations.
 
-```{r}
+```{r 10_10000}
 MyRandomHistogram(10)
 MyRandomHistogram(100)
 MyRandomHistogram(1000)
@@ -216,7 +216,7 @@ Typically at 10 observations there is very little evidence of any kind of struct
 
 How "normal" is the data in LIPP? Let's look at F2:
 
-``` {r}
+``` {r f2}
 qplot(LIPP$F2, binwidth = 50)
 ```
 
@@ -224,7 +224,7 @@ While the overall shape of this distribution is "bell-like" it is notably shifte
 
 A useful visual assessment tool when it comes to normal distributions is the "quantile-to-quantile" or Q-Q plot. `qqnorm()` plots the Q-Q distribution of the data and `qqline()` adds a diagonal line indictaing where a normally-distributed dataset having the same mean and S.D. as the sample data would be.
 
-```{r QQ1}
+```{r qq}
 qqnorm(LIPP$F2)
 qqline(LIPP$F2)
 ```
@@ -235,7 +235,7 @@ To refine our visual observation that the distribution is mostly normal with som
 
 To do this, we have to subset the data. This is done in R by putting square brackets after the variable and indicating the item or range of items you want to select. For example, we could select just the 1st F2 observation, or the 27th, or the 103rd through 109th:
 
-```{r}
+```{r f2_observations}
 LIPP$F2[1]
 LIPP$F2[27]
 LIPP$F2[103:109]
@@ -243,7 +243,7 @@ LIPP$F2[103:109]
 
 Let's run the Shapiro-Wilk test on the first 5000 observations of F2:
 
-```{r}
+```{r shapiro.test}
 shapiro.test(LIPP$F2[1:5000])
 ```
 
@@ -261,7 +261,7 @@ Why test for normality? If a distribution is normal, this indicates the applicab
 
 A while ago we looked at the differences in F2 distribution by speaker sex:
 
-```{r}
+```{r f2_sex}
 ggplot(data = LIPP, aes(x = F2)) +
   geom_histogram(binwidth = 50) +
   facet_wrap(. ~ sex)
@@ -272,7 +272,7 @@ Having observed  that the male & female speakers appear to have different F2 dis
 The formula for the t-test resembles that used in a wide variety of statistical tests. The two variables being used to subset the data are put first separated by a tilde. The dependent variable is placed first - this is the variable being tested. The second, independent variable is used to subset the data - the dataset will be split into groups based on this variable, which are then compared against each other. Finally, we specify the dataset.
 
 
-``` {r}
+``` {r t.test}
 t.test(F2 ~ sex, data = LIPP)
 ```
 
@@ -282,13 +282,13 @@ In fact, the *p* value in a t-test is just derived from the *t* value, with *t* 
 
 It's also possible to run a *one-sample t*-test, which we can easily do by simply selecting F2 as the test variable.
 
-```{r}
+```{r one-sample_t-test}
 t.test(LIPP$F2)
 ```
 
 What does this result tell us? As the *alternative hypothesis* comment notes, this test determines that the true mean is not equal to zero. A mean of zero is the default setting for a one-sample *t*-test, but we can substitute any number we like by adding the `mu` argument to the `t.test()` -- let's try with 1715 Hz, which is *very* close to the true mean.
 
-```{r}
+```{r mu}
 t.test(x = LIPP$F2, mu = 1715)
 ```
 
@@ -296,19 +296,19 @@ As we can see, the result here is still significant even in distinguishing betwe
 
 At any rate, when it comes to linguistic data, we are often looking at comparing across two groups, so the two-sample *t*-test is probably the more common implementation. Because the variable of sex/gender only has two levels in our data, male vs. female, the earlier 2-sample *t*-test covered everything we wanted to look at to evaluate the distributions relative to each other. Let's next explore the use of the *t*-test a bit more using some of the other variables in the data file. We can get a quick view of the whole data table by simply entering its name in R.
 
-``` {r}
+``` {r lipp}
 LIPP
 ```
 
 This quick view gives us the first 10 rows (i.e. observations) and 8 columns (i.e. variables) -- we can also open the object from the Environment tab to view the entire data table for a more full view, but this is sufficient for now. Notice that we have both ``language`` and ``english_status`` variables. The latter refers to whether English (the language of the interviews) is the speaker's first or second language. We can see how this variable breaks down pretty simply using the `table` function.
 
-``` {r}
+``` {r english_status}
 table(LIPP$english_status)
 ```
 
 We have pretty similar numbers of observations for each status. We can use the same *t*-test formula we performed earlier for speaker sex/gender, and see if F2 differs significantly according to English language status.
 
-``` {r}
+``` {r f2_english_status}
 t.test(F2 ~ english_status, data = LIPP)
 ```
 
@@ -316,13 +316,13 @@ Recall that a *t* value of +/- 1.96 is usually considered significant. Becuase t
 
 In thinking about this some more, however, we still might want to examine the effect of first language status further -- what if we compared speakers of different languages to each other? Let's see the breakdown of the `language` variable.
 
-```{r}
+```{r language}
 table(LIPP$language)
 ```
 
 English predominates, but we have at least 20,000 observations in each of the other three languages. Let's compare the two largest samples: English vs. Tagalog. To do this we need to change the formula in `t.test()` a little bit. We have to subset the data based on these two specific languages, using square brackets. And we will identify the two data subsets as the x and y variables inside `t.test()`:
 
-``` {r}
+``` {r t.test_language}
 t.test(x = LIPP$F2[LIPP$language == "English"], 
        y = LIPP$F2[LIPP$language == "Tagalog"])
 ```
@@ -331,12 +331,12 @@ This time the *t* value is a little larger, though still small, and the means ar
 
 What about English vs. the other two languages, Ilocano and Kapampangan?
 
-``` {r}
+``` {r ilocano}
 t.test(x = LIPP$F2[LIPP$language == "English"], 
        y = LIPP$F2[LIPP$language == "Ilocano"])
 ```
 
-``` {r}
+``` {r kapampangan}
 t.test(x = LIPP$F2[LIPP$language == "English"], 
        y = LIPP$F2[LIPP$language == "Kapampangan"])
 ```
@@ -345,7 +345,7 @@ For each of these tests we get much larger *t* values, and miniscule *p* values 
 
 Out of curiosity, what do these distributions look like in a plot? A density plot will accommodate the different token counts in each language - we can set the `fill` aesthetic to assign colour according to the `lanaguage` variable, and set a low `alpha` value inside `geom_density()` to allow us to see through the overlapping distributions
 
-```{r}
+```{r language_density}
 LIPP %>% 
   ggplot(aes(x = F2, fill = language)) +
   geom_density(alpha = 0.4) +
@@ -360,7 +360,7 @@ We started with a comparison of F2 across the two language statuses in the data,
 
 R has a built-in test for doing pairwise comparisons, i.e. exhaustively testing one pair at a time from all groups being considered. ``pairwise.t.test()`` produces a table of *p* values for each comparison, however it does not provide any other analysis.
 
-```{r}
+```{r pairwise.t.test}
 pairwise.t.test(LIPP$F2, LIPP$language)
 ```
 
@@ -370,7 +370,7 @@ The results here are just the *p* values which we obtained in the individual t-t
 
 An alternative to the pairwise t-test is the Analysis of Variance or ANOVA, which was designed to extend the power of the *t*-test beyond two groups or categories. ANOVAs can be carried out with the `aov()` function using the formula: `dependent.variable ~ independent.variable` and selecting the data. Typically, the ANOVA is first stored as an object (which we will call `LIPPanova`) and then `summary()` is used to report the results. We'll see why shortly.
 
-```{r}
+```{r anova}
 LIPPanova <- aov(F2 ~ language, data = LIPP)
 summary(LIPPanova)
 ```
@@ -379,7 +379,7 @@ The ANOVA tests the null hypothesis that the dependent and independent variables
 
 However, the ANOVA can be combined with the Tukey HSD ("honest significant difference") test to produce a more thorough analysis which includes pairwise comparisons across each group level. This is where the stored ANOVA object comes in handy, as we need to enter it into the `TukeyHSD()` function:
 
-```{r}
+```{r tukey}
 TukeyHSD(LIPPanova)
 ```
 
@@ -391,7 +391,7 @@ Paired t-tests and ANOVAs are called "parametric" tests, which are designed for 
 
 *Levene's test for homogeneity of variance* is designed to test if we have non-parametric (i.e. not normally-distributed) data. To run this test I'm using the `leveneTest()` function included in the `car` ("Companion to Applied Regression") so we'll need to install and load that first:
 
-```{r warning=FALSE}
+```{r leveneTest, warning=FALSE}
 if(!require(car)){install.packages("car")}
 library(car)
 
@@ -402,7 +402,7 @@ The low *p* value indicates that the groups in the independent variable (i.e. th
 
 There are a few alternatives to the standard ANOVA. One is the "Kruskal-Wallis rank sum test" -- the `kruskal.test()` function is included with the `stats()` package:
 
-```{r}
+```{r kruskal.test}
 if(!require(stats)){install.packages("stats")}
 library(stats)
 
@@ -411,13 +411,13 @@ kruskal.test(F2 ~ language, data = LIPP)
 
 There is even a form of the ANOVA -- Welch's one-way ANOVA -- which doesn't assume equal variances.
 
-```{r}
+```{r oneway.test}
 oneway.test(F2 ~ language, data = LIPP)
 ```
 
 And furthermore, the pairwise *t*-test which we saw earlier *can* be implemented for non-equal-variance comparisons by not pooling the standard deviations across groups.
 
-```{r}
+```{r pool.sd}
 pairwise.t.test(LIPP$F2, LIPP$language, pool.sd = FALSE)
 ```
 
@@ -429,7 +429,7 @@ The practical impact of this is that, for very large datasets, it's usually suff
 
 Sonderegger et al. actually advise avoiding *t*-tests entirely and use the non-parametric Wilcoxon test instead:
 
-```{r}
+```{r wilcox.test}
 wilcox.test(LIPP$F2[LIPP$sex == "male"],
             LIPP$F2[LIPP$sex == "female"])
 ```
@@ -442,7 +442,7 @@ Hopefully the set of tests provided here give you a range of options to use -- b
 
 We discussed one of the basic statistical measures, the *standard deviation* or S.D., in the context of  random data samples earlier. What is the S.D. of the LIPP F2 distribution?
 
-```{r}
+```{r sd_f2}
 sd(LIPP$F2)
 ```
 
@@ -452,7 +452,7 @@ S.D. is a measure of variance in the sample data being examined -- a low S.D. in
 
  There is no default function to calculate S.E. in R, but the formula is fairly straightforward, and can be calculated in two ways. I'll use `function()` to create two S.E. functions -- `se1` and `se2` -- and then enter the LIPP F2 data into each one to show that they get the same result:
 
-```{r}
+```{r se}
 se1 <- function(x) sqrt(var(x)/length(x))
 se2 <- function(x) sd(x)/sqrt(length(x))
 
@@ -465,7 +465,7 @@ The basic difference between S.D. and S.E. is that the former tells us about the
 CIs at 95% are equivalent to 1.96 times the S.E. +/- the mean. We can calculate all of these individually:
 
 
-```{r}
+```{r confidence_intervals}
 # Mean of F2
 mean(LIPP$F2)
 
@@ -481,7 +481,7 @@ mean(LIPP$F2)+1.96*se1(LIPP$F2)
 
 As an alternative, the `ci()` function in the `gmodels` package does the calculations for us, providing all the same numbers:
 
-```{r warning=FALSE}
+```{r ci, warning=FALSE}
 if(!require(gmodels)){install.packages("gmodels")}
 library(gmodels)
 ci(LIPP$F2)
