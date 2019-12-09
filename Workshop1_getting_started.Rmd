@@ -134,6 +134,12 @@ The main workshop files are written in R Markdown, which is a "markup" language 
 
 >Since you should now have the .rmd file loaded in RStudio, you are currently reading R Markdown code -- hopefully you can see how "light" of a coding language it is.
 
+Navigating Markdown documents can be done using the selection button at the bottom left of the Source pane (where R files open in RStudio). Headings and "chunks" of code will be listed there.
+
+```{r}
+include_graphics("images/source_navigation.png")
+```
+
 ## R packages
 
 Packages are bundles of functions (and sometimes data) which are downloaded into R and allow you to do many different things that "Base R" doesn't provide easy access to. In order to install a package in R, there are two methods:
