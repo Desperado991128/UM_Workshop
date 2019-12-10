@@ -18,7 +18,7 @@ opts_chunk$set(echo = TRUE)
 
 # ggPredict() Tutorial {-}
 
-This tutorial is by Keon-Woong Moon, published online at <https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html>
+The `ggPredict()` function is used to create interactive plots which allow you to display information about datapoints in the plot using your mouse. This tutorial is by Keon-Woong Moon, published online at <https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html>
 
 The tutorial begins here:
 
