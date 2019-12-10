@@ -1,0 +1,424 @@
+---
+title: "Linear Modeling"
+subtitle: "Workshop on Statistics for Linguistics"
+author: "Sky Onosson, University of Manitoba"
+output: 
+  html_document:
+    number_sections: true
+---
+
+<big>
+
+```{r knitr, include=FALSE, message=F, warning=F}
+library("knitr")
+opts_chunk$set(echo = TRUE)
+```
+
+---
+
+## Agenda {-}
+
+* Correlation
+* Generalized Linear Models
+
+---
+
+## Load required packages and LIPP data {-}
+
+```{r preliminaries, message=F, warning=F}
+if(!require(tidyverse)){install.packages("tidyverse")}
+library(tidyverse)
+
+if(!require(viridis)){install.packages("viridis")}
+library(viridis)
+
+LIPP <- read_csv("LIPP.csv")
+```
+
+# Correlation
+
+Correlation and regression are similar analytic methods with very distinct assumptions. *Correlation* assumes a non-causal relationship -- or rather, does *not* assume any causal relationship between variables. Correlations between continuous numerical variables can be conducted with the `cor()` function in R, providing a value between 0 and 1, with 1 being perfect correlation. The closer to 0, then, the weaker the correlation. Some analyses take >0.7 as a *strong* correlation, others >0.5, and many use <0.2 or <0.3 as a *weak* correlation -- these are all imprecise terms and are best used in comparison with other results.
+
+As an illustration, we might compare the F2 and F1 values across the LIPP dataset, i.e. aggregating all vowels as we have been doing. We should probably expect some sort of correlation, but given the number of vowels in English and their associated variation, we might not expect a strong correlation overall. There are a few methods of performing correlations -- Pearson's correlation coefficient assumes normal distributions (i.e. it is parametric), and Spearman's is non-parametric. Let's try both and see the result.
+
+```{r cor}
+cor(LIPP$F2, LIPP$F1, method = "pearson")
+cor(LIPP$F2, LIPP$F1, method = "spearman")
+```
+
+The two coefficients give remarkably similar results, indicative of a fairly weak correlation. Even if the distributions are not normal, the CLT tells us that for a large dataset such as we are working with, we should expect parametric tests to give similar results as non-parametric, and this is borne out here. 
+
+What do these results tell us? F1 and F2 are correlated, which means they tend to vary in a linked way, but the correlation is weak so there are many exceptions to this. We of course already know that this is because we are aggregating all of the vowels together, and should expect this correlation to be much stronger when considering each vowel individually. We can test this using the `tidyverse` functions `group_by()` and `summarize()`. `group_by()` allows us to specify one or more variables by which the dataset will be segregated into groups, and each group will then be fed individually into the following functions using the pipe operator. Putting `summarize()` as the next step will take the individual groups provided by `group_by()` and perform the specified function, in this case `cor()` using Spearman's coefficient (we will assume that at least some of these distributions are non-parametric). All of this will be stored as an object, `LIPP_cor`.
+
+>**Note**: As mentioned before, the vowels in the LIPP data file are indicated using the Arpabet system. Gere is a list of the Arpabet two-letter codes for each vowel and their IPA equivalents
+
+| Arpabet | IPA |
+|---|---|
+|AA|ɑ|
+|AE|æ|
+|AH|ə, ʌ|
+|AO|ɔ|
+|AW|aw|
+|AY|aj|
+|EH|ɛ|
+|ER|ɚ|
+|EY|e(j)|
+|IH|ɪ|
+|IY|i(j)|
+|OW|o(w)|
+|OY|ɔj|
+|UH|ʊ|
+|UW|u(w)|
+
+```{r LIPP_cor}
+LIPP_cor <- LIPP %>% 
+  group_by(vowel) %>% 
+  summarize(coefficient = cor(F1, F2, method = "spearman"))
+LIPP_cor
+```
+
+We can see that for some vowels there is a relatively stronger correlation: AA (0.38), AW (0.34), OW (0.47) and OY (0.44). For others, the correlation is much closer to zero: AE (0.03), EH (0.04), EY (0.05), IH (~0), etc. This is much easier to visualize if we plot the correlation coefficients by vowel, in ascending order. That last part is accomplished with the `reorder()` function, by specifying the selected variable, and a second variable which provides the values to base the order on.
+
+```{r reorder}
+ggplot(data = LIPP_cor, 
+       aes(x = reorder(vowel, coefficient), 
+           y = coefficient)) +
+  geom_point()
+```
+
+We can see quite clearly that there is a set of vowels -- largely but not exclusively lax vowels -- with a relatively low correlation between F1 and F2. There are two vowels with medial coefficients -- AY and ER. And, there are a set of vowels with coefficients between 0.3 and 0.6, which is relatively high within the entire group. Recall that considering the overall relationship between formants without segregating by vowel gave us only a relatively low coefficient -- we needed to consider the vowels individually to get a better picture of how the formants are correlated in the data.
+
+>**Note**: Again, we aren't trying to draw any large conclusions here, just looking at ways to explore correlation within a dataset.
+
+# Linear and Logistic Regression: Generalized Linear Models
+
+Linear regression differs from simple correlation in that it is used to test the hypothesis that two variables are correlated in a **causal** relationship -- testing for correlation makes no such assumption. A causal relationship requires one variable to influence the other but not vice versa -- in other words, the linear model needs to be formulated so that one variable is selected as *independent* of the other, i.e. it is the *cause* or *predictor*, and the other is *dependent* on the first, i.e. it shows the *effect*. In a lot of sociolinguistic research, this is the preferred type of analysis, as it provides a lot of explanatory power. If we can demonstrate a causal relationship, then we can argue for an explanation wherein one factor (i.e. the predictor variable) drives the variation (the effect) which we observe within our data.
+
+A logistic regression (in its most basic form) is a type of regression where one of the variables is continuous (numeric) and the other is categorical, with a 2-level or "binomial" regression being the simplest to deal with. Both linear and logistic regressions are classified as types of Generalized Linear Models, or glms.
+
+## One categorical variable
+
+Conducting a  regression is relatively straightforward. Let's revisit the sex/gender differences which we previously observed for F2 as a test. To recall, we observed differences between male and female speakers' F2 distributions, as indicated by plotting the distributions and running a *t*-test:
+
+``` {r f2_sex}
+ggplot(data = LIPP, aes(x = F2, fill = sex)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_viridis_d()
+
+t.test(F2 ~ sex, LIPP)
+```
+
+What is the relationship between sex/gender and F2, given these observed differences? I have never seen it proposed that F2 differences affect a speaker's sex/gender! (Although, they **could** perhaps affect our **perception** of gender -- but that is an entirely different question). It seems much more reasonable to propose that speaker sex/gender influences their F2 values -- posited differences in formant values between male & female speakers are the very reason that sociophoneticians have tended to either segregate speakers by sex/gender and/or normalize formant values across males and females. 
+
+This seems like an obvious point in this case, but in formulating a mathemical model, we need to consider which variable is the independent vs. dependent factor. Under the second model, sex/gender is independent of F2, but F2 is dependent on sex/gender which we suspect causes the differences in distributions -- ;et's call this the "sex-differentiated F2 model".
+
+What exactly is a (generalized) linear model? A linear model proposes to test a particular relationship of the kind we have described by comparing observations of one variable on the basis of another variable. It does so by calculating a mathematical relationship between the two variables which captures the maximum amount of variation within the data, and then comparing the observed variation around that line to determine how closely the linear model approximates the actual data. In some cases, the "fit" of the model will be very good, in other cases less so. It's important to keep in mind, too, that how much a good fit matters depends entirely on what kind of question you are asking, and how much variation you are expecting to exist in your data.
+
+Let's try a linear model in R which captures the "sex-differentiated F2" hypothesis. The function is simply `lm()` for "linear model", and the formula is the same as that used for the t-test:
+
+```{r lm}
+lm(F2 ~ sex, LIPP)
+```
+
+Because we used a 2-level categorical independent variable (or predictor), the model picked one level as a baseline.
+
+> **Note 1**: I'm pretty sure R does this by just selecting the first level in alphabetical order (in this case, female), and certainly there is nothing implied by which level is compared against which.
+
+> **Note 2**: Because a linear model is a mathematical relationship, it deals in numbers. When we include a categorical variable such as `sex` which has discrete, non-numeric levels like "female" and "male", it converts those into numbers when doing the calculation. We don't see this directly, but it's important to keep in mind.
+
+The base level, speakers categorized as female, provides the intercept level -- this is the F2 value predicted (on average) for all female speakers. The predicted difference in F2 for male speakers is provided next. In this case, it indicates that male speakerss have lower average F2 values, by about 217 Hz.
+
+How can we visualize the results of this model? To do this with `ggplot` requires dealing with some quirks of R, and adding to our knowledge of `ggplot` geoms.
+
+First, while `lm()` deals with categorical variables like `sex` by "numericizing" them behind the scenes, we have to explicitly convert this variable into a numeric equivalent when plotting -- or at least, I don't know a good alternative to this. To do this we need to understand something about R data types. When R looks at a column of data in a dataframe such as our `LIPP` object, it classifies the column as a data type. We can see these at the very top of each column under its name. `<dbl>` is the most common type of numeric data, and `<chr>` just means text, i.e. not a number.
+
+```{r lipp}
+LIPP
+```
+
+Every column is assumed to be a variable, called a `factor`, and every different entry in that column is a `level` of that `factor`. For example, we can get the levels of the factor `sex` with the `levels()` function:
+
+```{r levels}
+levels(LIPP$sex)
+```
+
+That didn't work! The (obscure) reason is that we need to explicitly ask R to treat `sex` as a factor.
+
+If we print out all of the entries under the `sex` column in `LIPP`, we get a bunch of character entries, shown by putting quotation marks around them. I'll just print the first 100 entries (all "female") to illustrate, otherwise this will occupy a huge amount of space:
+
+```{r 100}
+LIPP$sex[1:100]
+```
+
+In order to get R to deal with these as levels of the factor `sex` we can use the function `as.factor()`:
+
+```{r as.factor}
+as.factor(LIPP$sex[1:100])
+```
+
+Notice that this time there are no quotation marks around the word female, and that we also get a report that there are "Levels" (it only shows one level, female, because we told it not to look at the whole column of data).
+
+So, in order to get a report of the levels in a column, we need to put the column inside `as.factor()`, and then put *that* inside `levels()`!
+
+
+```{r embed}
+levels(as.factor(LIPP$sex))
+```
+
+Once we have told R that we are dealing with a factor, it can convert that to a number by using `as.numeric()` -- this is what happens behind the scenes inside `lm()`.
+
+```{r as.numeric}
+as.numeric(as.factor(LIPP$sex[1:100]))
+```
+
+All of the former "female" entries are now converted into "1"s. If we select a range of the data where we get both female and male entries -- which happens to occur between rows 35,000 and 35,100 -- we can see how the two levels are converted to 1s and 2s. 
+
+```{r}
+as.numeric(as.factor(LIPP$sex[35000:35100]))
+```
+
+*Finally* we need to know one more thing -- the binomial (logistic) regression model in R can only deal with data ranging from 0 to 1 -- anything else will produce an error. So, we need to subtract 1 from all these levels, to turn 1s into 0s, and 2s into 1s.
+
+```{r subtract}
+as.numeric(as.factor(LIPP$sex[35000:35100]))-1
+```
+
+To plot this model, we send the LIPP data into `ggplot`, tell it to put F2 on the x-axis, and our conversion of `sex` into a numeric factor, subtracted by 1, on the y-axis. I'll use `geom_point()` which plots each entry as a point on the chart:
+
+```{r f2_by_sex}
+LIPP %>% 
+  ggplot(aes(x = F2, 
+             y = as.numeric(as.factor(sex))-1)) + 
+  geom_point()
+```
+
+This looks... not great? And it doesn't even have the regression line! We can add that with the `geom_smooth()` function which is used to add a variety of analysis-based lines -- in this case we use the "lm" `method` of analysis.
+
+```{r geom_smooth}
+LIPP %>% 
+  ggplot(aes(x = F2, 
+             y = as.numeric(as.factor(sex))-1)) + 
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+Finally, we get a line! the direction of the line, descending on the y-axis as F2 ascends, tells us that lower F2 values are more associated with the points at "1" on the y-axis, and higher F2 values are more associated with the points at "0". Since the y-axis numbers are just substitutes for the `sex` categories of "male" and "female" respectively, it would be helpful to now replace these converted numbers with the original labels!
+
+This can be done with the ggplot function `scale_y_continuous()` using two arguments inside it -- `breaks` which tells it where to make tick marks on the axis, and `labels` which puts text on those texts. Since we are providing it with multiple (two) entries for both `breaks` and `labels`, they need to be inside the base-R function `c()` for "combine". We'll also add a y-axis title of "Speaker sex" using the `ylab()` function:
+
+```{r labels}
+LIPP %>% 
+  ggplot(aes(x = F2, 
+             y = as.numeric(as.factor(sex))-1)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_y_continuous(breaks = c(0, 1),
+                     labels = c("female", "male")) +
+  ylab("Speaker sex")
+```
+
+This looks much better. One way we could further improve it (depending on what you would like to see visualized) would be to separate out the various datapoints visually. This is easy to do in ggplot by replacing `geom_point()`, which plots points at their exact value, by `geom_jitter()`. This also plots points but "jitters" them around slightly so they don't overlap (as much). We can tell it to only "jitter" on the y-axis by restricting the jitter "width" (i.e. the x-axis) to zero. I'll also change the size of the points drastically, since there are many thousands of them.
+
+```{r geom_jitter}
+LIPP %>% 
+  ggplot(aes(x = F2, 
+             y = as.numeric(as.factor(sex))-1,)) + 
+  geom_jitter(size = 0.01, width = 0) +
+  geom_smooth(method = "lm") +
+  scale_y_continuous(breaks = c(0, 1),
+                     labels = c("female", "male")) +
+  ylab("Speaker sex")
+```
+
+Now we can see each vowel measurement, segregated into two "clouds" according to speaker sex, and aligned by F2 value, along with the regression line showing the association between F2 and sex.
+
+## Two numeric variables
+
+So far we have looked at a regression model with one numeric variable (F2) and one categorical variable (speaker sex/gender). This is categorized as a logistic regression, while a bona fide linear regression is restricted to analysis of two numeric variables (although both types fall within the family of "generalized linear models").
+
+One of the other social/demographic variables which we have in the LIPP dataset is `year` (of birth). We could investigate whether some aspect of the data is changing according to year of birth. One ongoing change in Canadian English is /u/-fronting or GOOSE-fronting, where the position of the vowel /u/ in many environments is acquiring a progressively more forward articulation, which correlates with higher F2 values. To test whether this is occurring in the LIPP data, we could model a linear regression of year as the predictor against F2, using data for the /u/ vowel only. We should probably also restrict our model to data from L1 English speakers only, as we might not necessarily expect this change to be occurring among speakers whose first language is not English.
+
+To restrict the data to only the vowel /u/ and only English L1 speakers, the LIPP data can be passed through the `tidyverse` `filter()` function. Inside `filter()` we specify which variables to restrict, and which levels of those variables to allow to pass through the filter. This is done by listing the variables one at a time separated by commas, and indicating how we want to restrict the variable. In each case here we want to allow only observations which "exactly" equal the selected levels -- this is indicated by a double equals sign `==`:
+
+```{r filter}
+LIPP %>% 
+  filter(vowel == "UW", english_status == "L1")
+```
+
+By doing this, the dataset has been reduced from 163,655 observations to just 2,752.
+
+To illustrate some of the ways we can restrict data, we could instead tell the filter to *not* allow any observations by L2 English speakers. This is the same subset of data, but arrived it in another way. To do this, we use the code for "not equal to" which is `!=`:
+
+```{r not}
+LIPP %>% 
+  filter(vowel == "UW", english_status != "L2")
+```
+
+Same result as before!
+
+The next step, having worked out our filter, is to "pipe" the filtered data into the `lm()` function. It is critical that we include a placeholder "." to indicate that the source dataset is coming from the "pipe". This can be very unintuitive, and I've made the mistake of excluding this many times!
+
+```{r filter_to_lm}
+LIPP %>% 
+  filter(vowel == "UW", english_status == "L1") %>% 
+  lm(F2 ~ year, .)
+```
+
+As before, to get the full linear model report we need to use the `summary()` function -- we can just add this at the end using the pipe operator again:
+
+```{r filter_to_lm_to_summary}
+LIPP %>% 
+  filter(vowel == "UW", english_status == "L1") %>% 
+  lm(F2 ~ year, .) %>% 
+  summary()
+```
+
+This model tells us that year of birth does indeed predict F2 values for /u/, which increase over time by +4.857 Hz per year -- there is, however, a lot of variability (see the very small R-squared value). 
+
+We can plot the distribution and the linear model together using a similar ggplot call as we used earlier for F2 by sex. In this case we have a bit less work to do because both variables, F2 and year, are both already numeric. We'll use `geom_jitter()` again with its default settings to plot the points.
+
+```{r}
+LIPP %>% 
+  filter(vowel == "UW", 
+         english_status == "L1") %>% 
+  ggplot(aes(year, F2)) + 
+  geom_jitter() +
+  geom_smooth(method = "lm")
+```
+
+As we see, there is truly *massive* variation around the linear model as indicated by the F2 values which are plotted on the y-axis. Even so, the model provides predictive power within this variation. 
+
+Is this a great result? Probably not, but we are also doing a very broad sweep of the data. We haven't restricted our /u/ tokens by context, for example -- /u/-fronting isn't present in all phonological environments, but is known to occur most strongly after coronal consonants. We can add another restriction to our filter to allow only tokens where the preceding segment is coronal. To do this, we need to create an object called `coronals` which will simply be a list of coronal consonants (in Arpabet transcription).
+
+by setting these up as a vector using the "combine" `c()` function, and the `%in%` operator within the `filter()` function.
+
+```{r coronals}
+coronals <- c("T", "D", "S", "Z", "N", "TH", "DH", "R")
+```
+
+We can now add a restriction in our filter, telling it to look at the `pre_seg` (preceding segment) column and restrict the data to tokens where this is some value which is `%in%` the set of items contained in `coronals`. Let's see what the linear model looks like now.
+
+```{r coronal_filter}
+LIPP %>% 
+  filter(vowel == "UW", english_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .) %>% 
+  summary()
+
+LIPP %>% 
+  filter(vowel == "UW", english_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .) %>% 
+  ggplot(aes(year, F2)) + 
+  geom_jitter() +
+  geom_smooth(method = "lm") 
+```
+
+If we compare this to the previous model, we see that the *t* and *F* values all increased, all of the *p* values got substantially smaller, and the R2 value increased, albeit still being quite small. In other words, we have improved the fit of the model by restricting the analysis to /u/ following coronal consonants.
+
+There are further plotting options we can explore with linear models. This time rather than "piping" all of the data together, I'll set up some objects in the R environment which we can refer back to. This can be an easier way of managing things when you have to reuse the same code several times, although it has the disadvantage of being somewhat less transparent.
+
+First, we will set up an object called `F2year_lm` which is a linear model of F2 by year of birth, using the same `filter()` to isolate only tokens of /u/ by L1 English speakers in post-coronal position.
+
+```{r F2year_lm}
+F2year_lm <- LIPP %>% 
+  filter(vowel == "UW", english_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .)
+```
+
+Next, we will use the `augment()` function from the `broom` package, which generates a data frame using output from the linear model function -- we'll assign this to an object called `F2year_table`.
+
+```{r augment}
+if(!require(broom)){install.packages("broom")}
+library(broom)
+
+F2year_table <- augment(F2year_lm)
+
+F2year_table
+```
+
+For each observation, we have the reported `F2` value, the `year` of birth of the speaker, the `.fitted` value (i.e. the mean as determined from the linear model), the `.se.fit` (standard error), the `.resid` (the distance the observation is from the fitted value), and some other values that we won't discuss. If we create a plot of the first two columns (and add our linear line using `geom_smooth()`), we get essentially the same output as the preceding plot
+
+> Note that the positions of each point are non-identical between this and the previous plot. This is because `geom_jitter()` generates random positions each time it is run -- you can try running the code below repeatedly to observe that the positions all shift slightly each time.
+
+```{r random_jitter}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_jitter() +
+  geom_smooth(method = "lm")
+```
+
+We can, however, now do some extended plotting using the `F2year_table` object which we created with `augment()`. I'll go through this step by step for clarity. We start with a plot of the individual points using `geom_jitter()`.
+
+```{r augment_jitter}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_jitter()
+```
+
+Next, we added the fitted values from the `.fitted` column, which we all assign a unique shape to so that they stand out -- I'll also increase the size of these points and colour them red, as they are easily obscured by the other points:
+
+```{r .fitted}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_jitter() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, colour = "red")
+```
+
+We can next add line segments to connect the fitted points:
+
+```{r geom_segment}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted)) +
+  geom_jitter() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red")
+```
+
+This method isn't perfect in this case -- due to the use of `geom_jitter`, the points are not where they should be on the x-axis, so don't line up with the segment ends. We can correct this by using `geom_point()` instead, although this results in most of the points overlapping invisibly.
+
+```{r no_jitter}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted)) +
+  geom_point() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red")
+```
+
+Let's add in the smooth linear regression line from before -- I'll also fade the residual segment lines by adjusting their alpha value, and colour them blue.
+
+```{r regression}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted), alpha = .1, col = "blue") +
+  geom_point() +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  geom_smooth(method = "lm", col = "red")
+```
+
+We can also modify the residuals themselves to indicate their position relative to the linear regression -- this is really helpful for indicating variance visually. There are a few ways to do this, but I'll do it here using colour. We set the colour value inside the `aes()` of `geom_point()` to be the `abs()` value of the `.resid` column, which tells us how far away each point is from the regression line. I'll scale the colours with the `scale_colour_viridis_c()` function for continuous values (e.g. the F2 values we are plotting). The result is that colours closest to the regression line are darker-hued, while those furthest away are lighter. The result is a colourful plot where the colour isn't merely superfluous, but indicates how the residuals are distributed.
+
+```{r residuals_colour}
+ggplot(F2year_table, aes(x = year, y = F2)) +
+  geom_segment(aes(xend = year, yend = .fitted), alpha = .1, col = "blue") +
+  geom_point(aes(col = abs(.resid))) +
+  scale_colour_viridis_c() +
+  guides(colour = FALSE) +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  geom_smooth(method = "lm", col = "red")
+```
+
+This entire plot can actually be created using our original method where everything is "piped" down from the LIPP dataframe -- the point of creating the objects for the linear model and then the table of that data using `augment()` was to show what data is available inside the `lm()` call. Many R functions generate data that isn't readily apparent, and it would be difficult to otherwise know that the appropriate terms to enter in the code below are `.fitted` and `.resid`, for example.
+
+```{r single_call_version}
+LIPP %>% 
+  filter(vowel == "UW", english_status == "L1",
+         pre_seg %in% coronals) %>% 
+  lm(F2 ~ year, .) %>% 
+  ggplot(aes(year, F2)) + 
+  geom_segment(aes(xend = year, yend = .fitted), alpha = .1, col = "blue") +
+  geom_point(aes(col = abs(.resid))) +
+  scale_colour_viridis_c() +
+  guides(colour = FALSE) +
+  geom_point(aes(y = .fitted), shape = 1, size = 4, col = "red") +
+  geom_smooth(method = "lm", col = "red")
+```
+
+
+
+</big>

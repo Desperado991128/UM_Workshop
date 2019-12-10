@@ -1,0 +1,175 @@
+---
+title: "Descriptive statistics (and more)"
+subtitle: "Workshop on Statistics for Linguistics"
+author: "Sky Onosson, University of Manitoba"
+output: 
+  html_document:
+    number_sections: true
+---
+
+<big>
+
+```{r knitr, include=FALSE, message=F, warning=F}
+library("knitr")
+opts_chunk$set(echo = TRUE)
+```
+
+---
+
+## Agenda {-}
+
+* Descriptive statistics
+* Boxplots
+
+---
+
+## Load required packages and LIPP data {-}
+
+```{r preliminaries, message=F, warning=F}
+if(!require(tidyverse)){install.packages("tidyverse")}
+library(tidyverse)
+
+if(!require(viridis)){install.packages("viridis")}
+library(viridis)
+
+LIPP <- read_csv("LIPP.csv")
+```
+
+---
+
+# Descriptive statistics -- Some basics
+
+As we saw before, you can get a general overview of your data by simply entering the object name:
+
+```{r lipp}
+LIPP
+```
+
+You can get a summary of major descriptive statistics for all of the columns (variables) in a dataframe using `summary()`:
+
+```{r summary}
+summary(LIPP)
+```
+
+For variables such as `sex` which are `Class :character`, only one number is reported - Length, which is simply the number of observations (rows). For numeric variables, a set of numbers are reported. Min., Median, Mean, and Max. should be fairly self-explanatory. 1st and 3rd Qu. report "quartiles", which derive from dividing the data distribution into even quarters. The 1st quartile occurs at 25% of the way into the distribution, and the 3rd is at 75% - the median is actually the 2nd quartile, occurring at the centrepoint or 50% of the distribution. All of these numbers can be accessed just for a single variable by specifying it in `summary()`:
+
+```{r f1}
+summary(LIPP$F1)
+```
+
+The last element shown in the full summary above (which is omitted from the single-item summary) is `NA's` - these are "not available" entries, where a piece of data is missing from the data for some reason.
+
+This is a good opportunity to introduce a couple of useful tidyverse functions. The first is `drop_na()` which is used to eliminate NAs from a dataframe by dropping any row with an NA (in any column). This is useful because NAs can cause problems for data analysis in some cases. Let's use this to create a copy of the LIPP data with all NAs removed:
+
+```{r drop_na}
+LIPP_no_NAs <- drop_na(LIPP)
+```
+
+Now if we do a summary of the new object, there should be no NA values:
+
+```{r summary_drop_na}
+summary(LIPP_no_NAs)
+```
+
+The other tidyverse function is called the `pipe` operator, and it looks like this: `%>%`
+
+The easiest way to enter this is with the shortcut `Ctrl+Shift+M` (`Command+Shift+M` also works on MacOS). The pipe takes some bit of R code, usually an object or function, and "pipes" it into some other function. For example, we could rewrite the creation of the `LIPP_no_NAs` object like this:
+
+```{r pipe}
+LIPP_no_NAs <- LIPP %>% drop_na()
+```
+
+When doing this, the function on the receiving end of the pipe does not have any arguments inside its parentheses - these are piped in from the other side. So in this case, the object `LIPP` is piped into `drop_na()` which operates on it as if it were in the parentheses. The assignment operator still works as usual, so this entire function then gets assigned to `LIPP_no_NAs`.
+
+This may not seem very useful for a single function (and it's really not), but the usefulness of the pipe comes out when you have multiple functions linked together.
+
+For example, let's say you wanted to take the LIPP dataset, drop all NAs, and produce a quickplot of F2. We could do this by creating a copy of the dataset using `drop_na()`, then using that object as the data source for `qplot()`:
+
+```{r qplot}
+LIPP_no_NAs <- drop_na(LIPP)
+qplot(F2, data = LIPP_no_NAs)
+```
+
+However, using the pipe operator, this can all be done in a single line of code which doesn't even require us to create a new object in R. We start with LIPP, pipe it into `drop_na()`, and then pipe that into `qplot()`. 
+
+>**Note:** For some functions like `qplot()` we need to still assign a data source when using the pipe -- to do this, put a period which acts as a placeholder for data coming from the pipe.
+
+```{r qplot_pipe}
+LIPP %>% drop_na() %>% qplot(F2, data = .)
+```
+
+While not necessary with such a short entry like this, it's often conventional to hit enter after each pipe, as the sections of code between pipes can sometimes be quite lengthy. As an illustration, I'll replace `qplot()` with `ggplot()` and `geom_histogram()`:
+
+```{r code_lines}
+LIPP %>% 
+  drop_na() %>% 
+  ggplot(aes(x = F2)) +
+  geom_histogram()
+```
+
+>**Note:** The pipe and the + connector following `ggplot()` function in much the same way, so it is somewhat confusing to have to use two different operators here - but the pipe does not work inside a ggplot call, at least at the present time.
+
+Writing the code this way means that we don't need to create a new, separate object in R to handle the "no NA" dataframe. It's very easy to get into the habit of making multiple copies of data as new objects, with slight differences between them such as dropping NAs, removing variables etc. This is not a great habit to get into as it can quickly lead to mistakes when the relationship between different objects isn't clear. This is especially easy to do if you do not have consistent object-naming protocols, but even then it is easy to mix things up. Minimizing the number of objects in the R Environment at any one time is a really good practice to get into.
+
+# Boxplots
+
+One of the most common way to illustrate descriptive statistics for a set of numeric data is with a boxplot, or a box-and-whiskers plot. Let's create a plot for F2 using the pipe operator to send the LIPP dataframe into a ggplot using `geom_boxplot()`. Note that in this case we need to assign the variable, F2, to the y-axis - if you try assigning it to x you will generate an error. 
+
+```{r geom_boxplot}
+LIPP %>%
+  ggplot(aes(y = F2)) +
+  geom_boxplot()
+```
+
+Here we have F2 plotted on the y-axis while the x-axis ranges, arbitrarily, from -0.4 to +0.4. This is actually meaningless, but we will later use the x-axis for other purposes.
+
+What does the boxplot show us? The rectangular box itself contains the central 50% range of the distribution, and the central line indicates the median (not the mean!) value, i.e. the value exactly in the centre of the data. The two extended lines or "whiskers" mark the range of the distribution up to 1.5 times the central 50% of the range - any observations beyond these points are considered to be "outliers", which are marked with dots. 
+
+If you recall, a summary of F2 produced a set of "quartile" numbers:
+
+```{r quartile}
+summary(LIPP$F2)
+```
+
+The 1st quartile marks 25% of the way into the range, and the 3rd quartile marks 75% of the way. In other words, the range sitting between these two indicates the central 50% of the distribution, called the "interquartile range" or IQR, which is the area contained inside the box in the boxplot. By convention, 1.5 * IQR is the length of the whiskers. So, all of the elements making up the boxplot are derived directly from the quantile numbers.
+
+One addition that can be made to a boxplot is to use the x-axis to segregate the data according to another categorical variable, such as vowel.
+
+```{r vowel_boxplot}
+LIPP %>%
+  ggplot(aes(y = F2, 
+             x = vowel)) +
+  geom_boxplot()
+```
+
+This is useful for comparing F2 values across different vowels. However, as the vowels are simply arranged alphabetically (according to Arpabet naming), it isn't easy to see the general trend in F2 values across vowels. 
+
+What would help would be to rank the vowels in order of F2 values. This can be achieved using the `fct_reorder()` "factor reorder" function. This allows one factor or variable - such as `vowel` to be ordered according to a function performed over some other factor. For a boxplot, median might be the most appropriate function. So, we can reorder `vowel` according to the median F2 value for each vowel:
+
+
+```{r fct_reorder}
+LIPP %>%
+  ggplot(aes(y = F2, 
+             x = fct_reorder(vowel, F2, .fun = median))) +
+  geom_boxplot()
+```
+
+Note that the x-axis label now includes the entire function call. If we don't want this, we can replace it using the `xlab()` function:
+
+```{r xlab}
+LIPP %>%
+  ggplot(aes(y = F2, 
+             x = fct_reorder(vowel, F2, .fun = median))) +
+  geom_boxplot() +
+  xlab("Vowel (arpabet)")
+```
+
+>This could also be done with the `labs()` function we saw earlier, but the code would look slightly different -- can you identify the precise difference?
+
+You can order variables using `fct_reorder()` by any function available in R which follows the following criteria:
+
+>It should take one vector for fct_reorder, and two vectors for fct_reorder2, and return a single value.
+
+Similar functions are `fct_relevel()` which lets you specify the levels of a factor in order, `fct_relabel()` which lets you assign labels to factor levels automatically, and `fct_recode()` which lets you manually change the factor levels.
+
+</big>
