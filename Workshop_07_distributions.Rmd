@@ -19,7 +19,7 @@ opts_chunk$set(echo = TRUE)
 ## Agenda {-}
 
 * Normal distributions
-* Testing of distributions
+* Testing of distributions: t-tests, ANOVAs
 
 ---
 

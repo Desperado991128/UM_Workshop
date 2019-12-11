@@ -23,7 +23,7 @@ opts_chunk$set(echo = TRUE)
 * What is a workflow for RStudio?
 * Create a project
 * Build an R Markdown document
-* Output to .pdf and .doc
+* Output to .docx
 
 ---
 
